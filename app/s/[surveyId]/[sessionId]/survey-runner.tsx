@@ -280,7 +280,6 @@ export function SurveyRunner({ initial }: { initial: RunnerInitial }) {
               <DoneView
                 reflection={phase.reflection}
                 feedback={phase.feedback}
-                surveyId={surveyId}
                 ctaText={initial.ctaText}
                 onFeedback={async (fb) => {
                   vibrate();
@@ -667,13 +666,11 @@ function SolutionGuidance({ items, ctaText }: { items: RecommendedSolution[]; ct
 function DoneView({
   reflection,
   feedback,
-  surveyId,
   ctaText,
   onFeedback,
 }: {
   reflection: Reflection | null;
   feedback: ReflectionFeedback | null;
-  surveyId: string;
   ctaText: string;
   onFeedback: (fb: ReflectionFeedback) => void;
 }) {
@@ -718,7 +715,7 @@ function DoneView({
         )}
         <p className="text-center text-xs text-ink-faint">この画面は閉じて大丈夫です</p>
         <p className="text-center text-sm">
-          <Link href={`/s/${surveyId}`} className={textBtn}>
+          <Link href="/" className={textBtn}>
             はじめから
           </Link>
         </p>
