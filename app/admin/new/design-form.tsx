@@ -4,7 +4,12 @@ import { useRef, useState, useTransition } from "react";
 import { readSse } from "@/lib/sse-client";
 import { createBlankSurvey, createSurveyFromDesign, type DesignDraft } from "../actions";
 import { btnPrimary, btnSecondary, btnText, Field, inputCls, textareaCls } from "../ui";
-import type { Solution } from "@/lib/types";
+import type { Solution, SurveyViewpoint } from "@/lib/types";
+
+const VIEWPOINTS: { value: SurveyViewpoint; label: string; hint: string }[] = [
+  { value: "individual", label: "あなた自身の視点で", hint: "回答者本人の行動と時間を聞く" },
+  { value: "organization", label: "チーム・組織の視点で", hint: "チームや部署の回り方を、見聞きした事実から聞く" },
+];
 
 type Status = "idle" | "queued" | "generating" | "streaming" | "done" | "error";
 
@@ -18,6 +23,7 @@ const PLACEHOLDER_PURPOSE =
   "例: 人手不足が続く中で、現場の何が本当のボトルネックになっているのかを知りたい。本人が自覚していない負担や、諦められている業務を見つけたい。";
 
 export function DesignForm({ solutions }: { solutions: Solution[] }) {
+  const [viewpoint, setViewpoint] = useState<SurveyViewpoint>("individual");
   const [purpose, setPurpose] = useState("");
   const [audience, setAudience] = useState("");
   const [solutionIds, setSolutionIds] = useState<string[]>([]);
@@ -45,7 +51,7 @@ export function DesignForm({ solutions }: { solutions: Solution[] }) {
       const res = await fetch("/api/admin/design", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ purpose, audience, solutionIds }),
+        body: JSON.stringify({ purpose, audience, viewpoint, solutionIds }),
         signal: ac.signal,
       });
       await readSse(res, ({ event, data }) => {
@@ -58,8 +64,8 @@ export function DesignForm({ solutions }: { solutions: Solution[] }) {
           setStatus("streaming");
           setPartial(data as Partial);
         } else if (event === "design") {
-          const d = data as Omit<DesignDraft, "purpose" | "audience" | "solution_ids">;
-          setDesign({ ...d, purpose, audience, solution_ids: solutionIds });
+          const d = data as Omit<DesignDraft, "purpose" | "audience" | "viewpoint" | "solution_ids">;
+          setDesign({ ...d, purpose, audience, viewpoint, solution_ids: solutionIds });
           setStatus("done");
         } else if (event === "error") {
           setError((data as { message: string }).message);
@@ -78,6 +84,32 @@ export function DesignForm({ solutions }: { solutions: Solution[] }) {
   return (
     <div className="space-y-8">
       <div className="space-y-4">
+        <Field label="視点" hint="質問の主語が変わります。">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {VIEWPOINTS.map((v) => {
+              const checked = viewpoint === v.value;
+              return (
+                <label
+                  key={v.value}
+                  className={`flex flex-col gap-0.5 rounded-md border px-3 py-2.5 text-sm cursor-pointer transition-colors duration-(--dur-fast) ${
+                    checked ? "border-accent bg-accent-soft text-accent" : "border-rule text-ink-muted"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="viewpoint"
+                    checked={checked}
+                    onChange={() => setViewpoint(v.value)}
+                    disabled={busy}
+                    className="sr-only"
+                  />
+                  <span className={checked ? "text-accent" : "text-ink"}>{v.label}</span>
+                  <span className="text-xs text-ink-faint">{v.hint}</span>
+                </label>
+              );
+            })}
+          </div>
+        </Field>
         <Field label="調査の目的" hint="何を知りたいか、なぜ知りたいかを自由に。長くて構いません。">
           <textarea
             value={purpose}
@@ -132,6 +164,7 @@ export function DesignForm({ solutions }: { solutions: Solution[] }) {
           <form action={createBlankSurvey}>
             <input type="hidden" name="purpose" value={purpose} />
             <input type="hidden" name="audience" value={audience} />
+            <input type="hidden" name="viewpoint" value={viewpoint} />
             <button type="submit" className={btnText} disabled={busy}>
               空のまま作る
             </button>

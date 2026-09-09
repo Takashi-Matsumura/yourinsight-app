@@ -1,5 +1,6 @@
 export type QuestionKind = "single" | "scale" | "text";
 export type SurveyStatus = "draft" | "published" | "closed";
+export type SurveyViewpoint = "individual" | "organization";
 export type SessionStatus = "in_progress" | "completed" | "abandoned";
 export type QuestionSource = "seed" | "llm" | "fallback";
 export type ReflectionFeedback = "agree" | "disagree";
@@ -29,6 +30,7 @@ export interface Survey {
   status: SurveyStatus;
   seed_questions: SeedQuestions | null;
   cta_text: string;
+  viewpoint: SurveyViewpoint;
   created_at: string;
   updated_at: string;
 }

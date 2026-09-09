@@ -1,5 +1,5 @@
 import { db, newId, nowIso } from "@/lib/db";
-import type { GeneratedQuestion, SeedQuestions, Survey, SurveyStatus, Topic } from "@/lib/types";
+import type { GeneratedQuestion, SeedQuestions, Survey, SurveyStatus, SurveyViewpoint, Topic } from "@/lib/types";
 
 interface SurveyRow {
   id: string;
@@ -12,6 +12,7 @@ interface SurveyRow {
   status: SurveyStatus;
   seed_questions: string | null;
   cta_text: string;
+  viewpoint: SurveyViewpoint;
   created_at: string;
   updated_at: string;
 }
@@ -62,6 +63,7 @@ export interface SurveyInput {
   max_per_topic?: number;
   hard_cap?: number;
   cta_text?: string;
+  viewpoint?: SurveyViewpoint;
 }
 
 export function createSurvey(input: SurveyInput): Survey {
@@ -69,8 +71,8 @@ export function createSurvey(input: SurveyInput): Survey {
   const now = nowIso();
   db()
     .prepare(
-      `INSERT INTO surveys (id, title, purpose, audience, intro_text, max_per_topic, hard_cap, status, seed_questions, cta_text, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', NULL, ?, ?, ?)`,
+      `INSERT INTO surveys (id, title, purpose, audience, intro_text, max_per_topic, hard_cap, status, seed_questions, cta_text, viewpoint, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', NULL, ?, ?, ?, ?)`,
     )
     .run(
       id,
@@ -81,6 +83,7 @@ export function createSurvey(input: SurveyInput): Survey {
       input.max_per_topic ?? 3,
       input.hard_cap ?? 15,
       input.cta_text ?? "ブースのスタッフにお尋ねください",
+      input.viewpoint ?? "individual",
       now,
       now,
     );
@@ -93,7 +96,7 @@ export function updateSurvey(id: string, patch: Partial<SurveyInput>): void {
   const next = { ...current, ...patch };
   db()
     .prepare(
-      `UPDATE surveys SET title = ?, purpose = ?, audience = ?, intro_text = ?, max_per_topic = ?, hard_cap = ?, cta_text = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE surveys SET title = ?, purpose = ?, audience = ?, intro_text = ?, max_per_topic = ?, hard_cap = ?, cta_text = ?, viewpoint = ?, updated_at = ? WHERE id = ?`,
     )
     .run(
       next.title,
@@ -103,6 +106,7 @@ export function updateSurvey(id: string, patch: Partial<SurveyInput>): void {
       next.max_per_topic,
       next.hard_cap,
       next.cta_text,
+      next.viewpoint,
       nowIso(),
       id,
     );

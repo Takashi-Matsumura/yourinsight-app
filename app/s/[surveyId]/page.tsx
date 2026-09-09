@@ -31,6 +31,8 @@ export default async function IntroPage(props: PageProps<"/s/[surveyId]">) {
             <div className="mt-6 space-y-3 text-[17px] leading-relaxed text-ink">
               {paragraphs.length > 0 ? (
                 paragraphs.map((p, i) => <p key={i}>{p}</p>)
+              ) : survey.viewpoint === "organization" ? (
+                <p>5分ほど、あなたのチームの回り方について聞かせてください。</p>
               ) : (
                 <p>5分ほど、あなたの最近の仕事について聞かせてください。</p>
               )}
