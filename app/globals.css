@@ -1,26 +1,228 @@
+/* Hallmark · app-scope (survey flow) · genre: editorial · tone: quiet, letter-like · anchor hue: teal-green 200° */
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --paper: oklch(97.5% 0.009 80);
+  --paper-2: oklch(99.2% 0.005 85);
+  --paper-3: oklch(94.5% 0.012 80);
+  --ink: oklch(23% 0.015 60);
+  --ink-muted: oklch(50% 0.02 60);
+  --ink-faint: oklch(68% 0.015 65);
+  --rule: oklch(88% 0.012 75);
+  --accent: oklch(44% 0.07 200);
+  --accent-ink: oklch(99% 0.005 85);
+  --accent-soft: oklch(93.5% 0.028 200);
+  --danger: oklch(52% 0.16 25);
+  --focus: oklch(55% 0.11 200);
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --background: var(--paper);
+  --foreground: var(--ink);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 150ms;
+  --dur-base: 220ms;
+  --dur-slow: 420ms;
+  --radius-sm: 6px;
+  --radius-md: 10px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: oklch(20% 0.01 60);
+    --paper-2: oklch(24% 0.012 60);
+    --paper-3: oklch(28% 0.012 60);
+    --ink: oklch(92% 0.01 80);
+    --ink-muted: oklch(70% 0.015 70);
+    --ink-faint: oklch(52% 0.012 65);
+    --rule: oklch(33% 0.012 60);
+    --accent: oklch(74% 0.08 200);
+    --accent-ink: oklch(18% 0.02 200);
+    --accent-soft: oklch(30% 0.045 200);
+    --danger: oklch(70% 0.15 25);
+    --focus: oklch(78% 0.1 200);
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-paper-3: var(--paper-3);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-rule: var(--rule);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-focus: var(--focus);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --font-sans:
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP",
+    "Noto Sans CJK JP", "Yu Gothic", system-ui, sans-serif;
+  --font-serif:
+    var(--font-serif-jp), "Hiragino Mincho ProN", "Noto Serif JP",
+    "Noto Serif CJK JP", "Yu Mincho", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --ease-out: var(--ease-out);
+  --ease-in: var(--ease-in);
+  --ease-in-out: var(--ease-in-out);
+}
+
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  overflow-x: clip;
+}
+
+html {
+  color-scheme: light dark;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "palt";
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+[role="button"],
+a {
+  touch-action: manipulation;
+}
+
+input,
+textarea,
+select {
+  font-size: max(1rem, 16px);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@utility pb-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom) + --spacing(4));
+}
+
+@utility pt-safe {
+  padding-top: calc(env(safe-area-inset-top) + --spacing(4));
+}
+
+@utility caret-blink {
+  &::after {
+    content: "";
+    display: inline-block;
+    width: 2px;
+    height: 0.95em;
+    margin-left: 2px;
+    vertical-align: -0.1em;
+    background: currentColor;
+    animation: caret 1s steps(2, start) infinite;
+  }
+}
+
+@keyframes caret {
+  to {
+    visibility: hidden;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-x {
+  from {
+    translate: var(--slide-offset, 0);
+  }
+  to {
+    translate: 0;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+  to {
+    opacity: 1;
+    translate: 0;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-old(.card-out) {
+  --slide-offset: -24px;
+  animation:
+    var(--dur-fast) var(--ease-in) both fade reverse,
+    var(--dur-fast) var(--ease-in) both slide-x reverse;
+}
+
+::view-transition-new(.card-in) {
+  --slide-offset: 24px;
+  animation:
+    var(--dur-base) var(--ease-out) var(--dur-fast) both fade,
+    var(--dur-slow) var(--ease-out) both slide-x;
+}
+
+::view-transition-old(.soft-out) {
+  animation: var(--dur-fast) var(--ease-in) both fade reverse;
+}
+
+::view-transition-new(.soft-in) {
+  animation: var(--dur-base) var(--ease-out) both fade;
+}
+
+.rise {
+  animation: rise var(--dur-slow) var(--ease-out) both;
+}
+
+.breathe {
+  animation: breathe 1.8s var(--ease-in-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+  .rise,
+  .breathe {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
 }

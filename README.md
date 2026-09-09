@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# yourinsight
 
-## Getting Started
+スマートフォン向けの、AIによる適応型アンケートアプリです。固定の質問票を用意する代わりに、調査の「目的」と「知りたいことの道筋（論点）」だけを定義すると、回答者の回答内容に応じてローカルLLMが次の質問をリアルタイムに生成します。
 
-First, run the development server:
+回答が終わると、その人の回答だけをもとにした短い「振り返り」を生成して表示します。断定はせず、本人が話してくれたことを静かに言い直し、ひとつだけ問いかけの形で気づきを添える、という体験を目指しています。
+
+## 主な機能
+
+- **適応型の質問生成**: 目的と論点をもとに、行動・事実ベースの質問をLLMがその場で1問ずつ作成
+- **論点カバレッジ駆動**: 「あと何問」ではなく論点の充足状況で進行を管理し、必要な情報が揃ったら自動的に終了
+- **待ち時間ゼロの導入**: 最初の質問（と主要な分岐）は公開時に生成・保存しておき、回答者が待つのは3問目以降だけ
+- **ストリーミング表示**: 質問文・振り返り文をSSEで1文字ずつ表示し、生成中の間も体験を止めない
+- **匿名回答**: 個人を特定する情報は扱わない設計（外部IDによる将来的な突合用のフィールドのみ用意）
+- **管理画面**: アンケートの作成・編集、QRコード付き回答用URLの発行、回答一覧・集計・CSVエクスポート、AIによる横断的な分析
+- **関連リソースの案内（任意機能）**: 案内したい情報（製品・サービスなど）をカタログとして登録しておくと、回答内容に本当に合致した場合にだけ、振り返りの後に案内を表示します。無理な当てはめはしません。カタログを登録しなければこの機能は一切動作しません
+
+## 技術構成
+
+- [Next.js 16](https://nextjs.org/)（App Router / Turbopack）
+- React 19 / TypeScript
+- Tailwind CSS v4
+- SQLite（Node.js標準の `node:sqlite` を使用。追加のネイティブ依存なし）
+- ローカルLLM（OpenAI互換の `/v1/chat/completions` エンドポイントを持つサーバであれば利用可能。[llama.cpp](https://github.com/ggml-org/llama.cpp) のサーバモードなどを想定）
+
+## 必要な環境
+
+- Node.js 22.5 以降（`node:sqlite` を使用するため。開発は Node.js 24 系で確認）
+- JSON Schema による構造化出力（`response_format.json_schema`）に対応した、OpenAI互換のLLM推論サーバ
+  - `/v1/models` と `/v1/chat/completions` の両方に対応していること
+  - モデルによっては構造化出力に対応していない場合があるため、`/admin/settings` の疎通テストで実際に動作確認することを推奨します
+
+## セットアップ
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`http://localhost:3000` で起動します。初回アクセス時に SQLite データベースファイル（既定では `.data/yourinsight.db`）が自動的に作成されます。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### LLM接続の設定
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`/admin/settings` から、推論サーバのベースURL・モデル名・同時実行数などを設定します。環境変数は不要です（設定値はデータベースに保存されます）。
 
-## Learn More
+同時実行数は、推論サーバが同時に処理できるリクエスト数（例: llama.cpp サーバの `-np` オプション）に合わせて設定してください。
 
-To learn more about Next.js, take a look at the following resources:
+### データベースの保存先を変更する場合
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+DB_PATH=/path/to/your.db npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 実機（スマートフォン）での動作確認
 
-## Deploy on Vercel
+LAN内の別端末から開発サーバへアクセスする場合は、`next.config.ts` の `allowedDevOrigins` にアクセス元のホスト名・IPアドレスを追加してください。
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```ts
+const nextConfig: NextConfig = {
+  allowedDevOrigins: ["192.168.1.23"], // 実機のIPアドレスなどに置き換える
+};
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## スクリプト
+
+| コマンド | 内容 |
+|---|---|
+| `npm run dev` | 開発サーバを起動 |
+| `npm run build` | 本番ビルド |
+| `npm run start` | 本番サーバを起動 |
+| `npm run lint` | ESLint を実行 |
+| `npm run typecheck` | 型チェック（`tsc --noEmit`）を実行 |
+
+## ディレクトリ構成（概要）
+
+```
+app/
+  s/[surveyId]/[sessionId]/   回答者向けUI
+  admin/                      管理画面
+  api/                        ストリーミングAPI・管理API
+lib/
+  db.ts, schema.ts            SQLiteの接続とスキーマ
+  repo/                       データアクセス層
+  llm/                        LLMクライアント・プロンプト・スキーマ
+  survey/                     アンケート生成エンジン
+```
+
+## 認証について
+
+現時点では `/admin` に認証機構はありません。社内LANなど、信頼できるネットワーク内での利用を前提としています。
