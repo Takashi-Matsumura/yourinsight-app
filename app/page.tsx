@@ -1,3 +1,4 @@
+/* Hallmark · genre: editorial · macrostructure: Marquee Hero (single-viewport, mobile-only — CTA visible immediately, no true below-fold on a kiosk screen) · theme: locked (existing app tokens, burnt-orange accent hue 38) · enrichment: none (typography + one CTA card) · nav: none · footer: none */
 import Link from "next/link";
 import { connection } from "next/server";
 import { listSurveys } from "@/lib/repo/surveys";
@@ -10,38 +11,74 @@ export default async function Home() {
 
   return (
     <main className="flex flex-1 flex-col px-6 pt-safe pb-safe max-w-md w-full mx-auto">
-      <header className="pt-10 pb-8">
-        <p className="font-serif text-2xl text-ink">yourinsight</p>
-        <p className="mt-2 text-sm text-ink-muted">答えによって次の質問が変わる、短い対話型アンケート</p>
+      <header className="pt-12 pb-10 rise">
+        <p className="font-serif text-4xl tracking-tight text-ink">yourinsight</p>
+        <p className="mt-3 text-[15px] leading-relaxed text-ink-muted">
+          答えによって、次の質問が変わります。
+        </p>
       </header>
 
-      <section className="flex-1">
+      <section className="flex-1 flex flex-col gap-4">
         {surveys.length === 0 ? (
-          <p className="text-sm text-ink-muted">公開中のアンケートはまだありません。</p>
+          <p className="rise text-sm text-ink-muted" style={{ animationDelay: "80ms" }}>
+            公開中のアンケートはまだありません。
+          </p>
         ) : (
-          <ul className="divide-y divide-rule border-y border-rule">
-            {surveys.map((s) => (
-              <li key={s.id}>
-                <Link
-                  href={`/s/${s.id}`}
-                  className="flex items-center justify-between py-4 text-ink hover:text-accent focus-visible:text-accent"
-                >
-                  <span className="font-serif text-lg">{s.title}</span>
-                  <span aria-hidden className="text-ink-faint">
-                    →
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          surveys.map((s, i) =>
+            i === 0 ? (
+              <SurveyHero key={s.id} id={s.id} title={s.title} introText={s.intro_text} />
+            ) : (
+              <SurveySecondary
+                key={s.id}
+                id={s.id}
+                title={s.title}
+                delayMs={80 + i * 40}
+              />
+            ),
+          )
         )}
       </section>
-
-      <footer className="pt-8">
-        <Link href="/admin" className="text-sm text-ink-muted underline underline-offset-4">
-          管理画面
-        </Link>
-      </footer>
     </main>
+  );
+}
+
+function SurveyHero({ id, title, introText }: { id: string; title: string; introText: string }) {
+  return (
+    <Link
+      href={`/s/${id}`}
+      className="rise group block rounded-md bg-accent px-5 py-6 text-accent-ink transition-[filter,transform] duration-(--dur-fast) ease-(--ease-out) hover:brightness-110 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+      style={{ animationDelay: "80ms" }}
+    >
+      <p className="font-serif text-2xl leading-snug break-words">{title}</p>
+      {introText && (
+        <p className="mt-2 text-sm leading-relaxed text-accent-ink/80 line-clamp-2">{introText}</p>
+      )}
+      <div className="mt-5 flex items-center gap-3">
+        <span className="text-[15px] font-medium">はじめる</span>
+        <span
+          aria-hidden
+          className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-ink text-accent transition-transform duration-(--dur-fast) ease-(--ease-out) group-hover:translate-x-0.5"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function SurveySecondary({ id, title, delayMs }: { id: string; title: string; delayMs: number }) {
+  return (
+    <Link
+      href={`/s/${id}`}
+      className="rise flex items-center justify-between gap-3 rounded-md border border-rule px-5 py-4 text-ink transition-colors duration-(--dur-fast) hover:border-accent hover:text-accent focus-visible:border-accent focus-visible:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+      style={{ animationDelay: `${delayMs}ms` }}
+    >
+      <span className="font-serif text-lg break-words">{title}</span>
+      <span aria-hidden className="shrink-0 text-ink-faint">
+        →
+      </span>
+    </Link>
   );
 }
