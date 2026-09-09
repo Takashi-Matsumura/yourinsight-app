@@ -13,9 +13,11 @@ import {
 import { questionPayload } from "@/lib/survey/start";
 import {
   completeSession,
-  deleteUnansweredQuestionsAfter,
+  countAnswersAfter,
   getCoverage,
   getQuestion,
+  listQA,
+  truncateSessionAfter,
   upsertAnswer,
 } from "@/lib/repo/sessions";
 
@@ -25,6 +27,7 @@ interface Body {
   questionId?: string;
   value?: string;
   freeText?: string | null;
+  rewind?: boolean;
 }
 
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[sessionId]/next">) {
@@ -41,17 +44,21 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[se
 
     if (body.questionId && typeof body.value === "string") {
       const q = getQuestion(body.questionId);
-      if (!q || q.session_id !== sessionId) {
-        send("error", { message: "質問が見つかりません" });
-        return;
+      if (q && q.session_id === sessionId) {
+        const discarded = countAnswersAfter(sessionId, q.order_index);
+        if (discarded > 0 && !body.rewind) {
+          send("error", { message: "この回答はもう送信されています" });
+          return;
+        }
+        truncateSessionAfter(sessionId, q.order_index);
+        upsertAnswer({
+          question_id: q.id,
+          session_id: sessionId,
+          value: body.value.trim().slice(0, 500),
+          free_text: body.freeText ? body.freeText.trim().slice(0, 500) || null : null,
+        });
       }
-      upsertAnswer({
-        question_id: q.id,
-        session_id: sessionId,
-        value: body.value.trim().slice(0, 500),
-        free_text: body.freeText ? body.freeText.trim().slice(0, 500) || null : null,
-      });
-      deleteUnansweredQuestionsAfter(sessionId, q.order_index);
+      // q が見つからない場合は何もせず、下の snapshot() が現在の pending 質問を返す
     }
 
     const { qa, coverage } = snapshot(ectx);
@@ -88,6 +95,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[se
         onDelta: (partial) => send("token", partial),
       });
       if (signal.aborted) return;
+      if (listQA(sessionId).length !== orderIndex) return; // 別リクエストが状況を進めていた
       applySatisfied(ectx, r.generated);
       const after = getCoverage(sessionId);
       const reasonAfter = r.done ? "all_satisfied" : completionReason(ectx, after, qa.length);
@@ -100,6 +108,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[se
       send("question", questionPayload(ectx, q));
     } catch (e) {
       if (signal.aborted) return;
+      if (listQA(sessionId).length !== orderIndex) return; // 別リクエストが状況を進めていた
       console.error("[session/next] generation failed:", e instanceof Error ? e.message : e);
       const fb = fallbackFor(ectx, coverage, qa);
       if (!fb) {

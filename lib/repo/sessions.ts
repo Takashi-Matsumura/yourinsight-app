@@ -35,6 +35,7 @@ interface QuestionRow {
   source: QuestionSource;
   latency_ms: number | null;
   created_at: string;
+  satisfied_topic_ids: string;
 }
 
 interface CoverageRow {
@@ -55,7 +56,13 @@ function rowToQuestion(r: QuestionRow): Question {
   } catch {
     options = [];
   }
-  return { ...r, options };
+  let satisfiedTopicIds: string[] = [];
+  try {
+    satisfiedTopicIds = JSON.parse(r.satisfied_topic_ids) as string[];
+  } catch {
+    satisfiedTopicIds = [];
+  }
+  return { ...r, options, satisfied_topic_ids: satisfiedTopicIds };
 }
 
 export function createSession(surveyId: string): Session {
@@ -130,14 +137,15 @@ export interface QuestionInput {
   options: string[];
   source: QuestionSource;
   latency_ms: number | null;
+  satisfied_topic_ids: string[];
 }
 
 export function insertQuestion(q: QuestionInput): Question {
   const id = newId();
   db()
     .prepare(
-      `INSERT INTO questions (id, session_id, order_index, topic_id, lead, text, kind, options, source, latency_ms, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO questions (id, session_id, order_index, topic_id, lead, text, kind, options, source, latency_ms, created_at, satisfied_topic_ids)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       id,
@@ -151,6 +159,7 @@ export function insertQuestion(q: QuestionInput): Question {
       q.source,
       q.latency_ms,
       nowIso(),
+      JSON.stringify(q.satisfied_topic_ids),
     );
   return getQuestion(id)!;
 }
@@ -219,13 +228,53 @@ export function markSatisfied(sessionId: string, topicIds: string[]): void {
   for (const id of topicIds) stmt.run(sessionId, id);
 }
 
-export function deleteUnansweredQuestionsAfter(sessionId: string, orderIndex: number): void {
-  db()
+export function countAnswersAfter(sessionId: string, orderIndex: number): number {
+  const row = db()
     .prepare(
-      `DELETE FROM questions WHERE session_id = ? AND order_index > ?
-       AND id NOT IN (SELECT question_id FROM answers WHERE session_id = ?)`,
+      `SELECT COUNT(*) AS n FROM answers a
+       JOIN questions q ON q.id = a.question_id
+       WHERE a.session_id = ? AND q.order_index > ?`,
     )
-    .run(sessionId, orderIndex, sessionId);
+    .get(sessionId, orderIndex) as { n: number };
+  return row.n;
+}
+
+export function truncateSessionAfter(sessionId: string, orderIndex: number): void {
+  const d = db();
+  d.exec("BEGIN");
+  try {
+    d.prepare("DELETE FROM questions WHERE session_id = ? AND order_index > ?").run(sessionId, orderIndex);
+    d.prepare("UPDATE topic_coverage SET satisfied = 0, asked_count = 0 WHERE session_id = ?").run(sessionId);
+    const survivors = d
+      .prepare("SELECT topic_id, satisfied_topic_ids FROM questions WHERE session_id = ?")
+      .all(sessionId) as unknown as { topic_id: string | null; satisfied_topic_ids: string }[];
+
+    const askedCounts = new Map<string, number>();
+    const satisfiedIds = new Set<string>();
+    for (const row of survivors) {
+      if (row.topic_id) askedCounts.set(row.topic_id, (askedCounts.get(row.topic_id) ?? 0) + 1);
+      try {
+        for (const id of JSON.parse(row.satisfied_topic_ids) as string[]) satisfiedIds.add(id);
+      } catch {
+        // ignore malformed rows
+      }
+    }
+
+    const askedStmt = d.prepare(
+      "UPDATE topic_coverage SET asked_count = ? WHERE session_id = ? AND topic_id = ?",
+    );
+    for (const [topicId, count] of askedCounts) askedStmt.run(count, sessionId, topicId);
+
+    const satisfiedStmt = d.prepare(
+      "UPDATE topic_coverage SET satisfied = 1 WHERE session_id = ? AND topic_id = ?",
+    );
+    for (const topicId of satisfiedIds) satisfiedStmt.run(sessionId, topicId);
+
+    d.exec("COMMIT");
+  } catch (e) {
+    d.exec("ROLLBACK");
+    throw e;
+  }
 }
 
 export function parseReflection(raw: string | null): Reflection | null {

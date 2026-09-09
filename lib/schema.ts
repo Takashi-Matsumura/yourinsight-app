@@ -18,6 +18,9 @@ export function migrate(d: DatabaseSync): void {
   if (!hasColumn("surveys", "viewpoint")) {
     d.exec("ALTER TABLE surveys ADD COLUMN viewpoint TEXT NOT NULL DEFAULT 'individual'");
   }
+  if (!hasColumn("questions", "satisfied_topic_ids")) {
+    d.exec("ALTER TABLE questions ADD COLUMN satisfied_topic_ids TEXT NOT NULL DEFAULT '[]'");
+  }
 }
 
 export const SCHEMA_SQL = `
@@ -92,6 +95,7 @@ CREATE TABLE IF NOT EXISTS questions (
   source TEXT NOT NULL CHECK (source IN ('seed','llm','fallback')),
   latency_ms INTEGER,
   created_at TEXT NOT NULL,
+  satisfied_topic_ids TEXT NOT NULL DEFAULT '[]',
   UNIQUE (session_id, order_index)
 );
 

@@ -4,7 +4,14 @@
 import Link from "next/link";
 import { startTransition, useEffect, useRef, useState, ViewTransition } from "react";
 import { readSse } from "@/lib/sse-client";
-import { ESCAPE_OPTION, type Light, type PublicQuestion, type QuestionPayload, type RunnerInitial } from "@/lib/survey/public";
+import {
+  ESCAPE_OPTION,
+  type Light,
+  type PublicAnsweredQuestion,
+  type PublicQuestion,
+  type QuestionPayload,
+  type RunnerInitial,
+} from "@/lib/survey/public";
 import type { Reflection, ReflectionFeedback, RecommendedSolution } from "@/lib/types";
 import { sessionStorageKey } from "../resume-link";
 
@@ -41,7 +48,13 @@ interface AnswerBody {
   questionId: string;
   value: string;
   freeText?: string | null;
+  rewind?: boolean;
 }
+
+type Overlay =
+  | { kind: "loading" }
+  | { kind: "list"; items: PublicAnsweredQuestion[]; confirming: number | null }
+  | { kind: "edit"; items: PublicAnsweredQuestion[]; item: PublicAnsweredQuestion; discard: number };
 
 const SCALE_VALUES = ["1", "2", "3", "4", "5"];
 
@@ -67,6 +80,8 @@ export function SurveyRunner({ initial }: { initial: RunnerInitial }) {
   const { surveyId, sessionId } = initial;
   const [lights, setLights] = useState<Light[]>(initial.lights);
   const [remaining, setRemaining] = useState(initial.remaining);
+  const [answeredCount, setAnsweredCount] = useState(initial.answered);
+  const [overlay, setOverlay] = useState<Overlay | null>(null);
   const [phase, setPhase] = useState<Phase>(() => {
     if (initial.status === "completed") {
       return { kind: "done", reflection: initial.reflection, feedback: initial.feedback };
@@ -101,6 +116,7 @@ export function SurveyRunner({ initial }: { initial: RunnerInitial }) {
     startTransition(() => {
       setLights(p.lights);
       setRemaining(p.remaining);
+      setAnsweredCount(p.answered);
       setPhase({ kind: "question", q: p.question });
     });
   }
@@ -217,11 +233,34 @@ export function SurveyRunner({ initial }: { initial: RunnerInitial }) {
   }
 
   const canEnd = phase.kind === "question" || phase.kind === "waiting";
+  const canBrowseHistory = canEnd && answeredCount > 0;
+
+  async function openHistory() {
+    setOverlay({ kind: "loading" });
+    try {
+      const res = await fetch(`/api/session/${sessionId}/history`);
+      const data = (await res.json()) as { items: PublicAnsweredQuestion[] };
+      setOverlay({ kind: "list", items: data.items, confirming: null });
+    } catch {
+      setOverlay(null);
+    }
+  }
+
+  function closeOverlay() {
+    setOverlay(null);
+  }
+
+  function submitEdit(q: PublicQuestion, value: string, freeText?: string) {
+    setOverlay(null);
+    vibrate();
+    requestNext({ questionId: q.id, value, freeText: freeText ?? null, rewind: true }, { q, value, freeText });
+  }
 
   return (
-    <main className="flex flex-1 flex-col w-full max-w-md mx-auto px-6 pt-safe pb-safe">
+    <>
+    <main className="flex flex-1 flex-col w-full max-w-md mx-auto px-6 pt-safe pb-safe" inert={overlay !== null}>
       <header className="flex items-center justify-between py-3">
-        <Lights lights={lights} />
+        <Lights lights={lights} answeredCount={answeredCount} onOpen={canBrowseHistory ? openHistory : null} />
         <p className="text-xs text-ink-muted tabular-nums">
           {phase.kind === "done" || phase.kind === "reflecting"
             ? ""
@@ -288,6 +327,17 @@ export function SurveyRunner({ initial }: { initial: RunnerInitial }) {
         </footer>
       )}
     </main>
+
+    {overlay && (
+      <HistorySheet
+        overlay={overlay}
+        pendingExtra={phase.kind === "question" ? 1 : 0}
+        onClose={closeOverlay}
+        onSetOverlay={setOverlay}
+        onSubmit={submitEdit}
+      />
+    )}
+    </>
   );
 }
 
@@ -308,33 +358,71 @@ const primaryBtn =
 const textBtn =
   "min-h-11 px-2 underline underline-offset-4 decoration-rule text-ink-muted hover:text-ink hover:decoration-ink-muted transition-colors duration-(--dur-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus rounded-sm";
 
-function Lights({ lights }: { lights: Light[] }) {
+function Lights({
+  lights,
+  answeredCount,
+  onOpen,
+}: {
+  lights: Light[];
+  answeredCount: number;
+  onOpen: (() => void) | null;
+}) {
+  if (!onOpen) {
+    return (
+      <ol className="flex items-center gap-2" aria-label="論点の進み具合">
+        {lights.map((l, i) => (
+          <li
+            key={i}
+            aria-label={`${l.label}: ${l.satisfied ? "聞き終えた" : "まだ"}`}
+            className={`size-2.5 rounded-full transition-colors duration-(--dur-slow) ease-(--ease-out) ${
+              l.satisfied ? "bg-accent" : "border border-ink-faint"
+            }`}
+          />
+        ))}
+      </ol>
+    );
+  }
+
+  const summary = `論点${lights.length}件のうち${lights.filter((l) => l.satisfied).length}件を聞き終えました`;
+
   return (
-    <ol className="flex items-center gap-2" aria-label="論点の進み具合">
-      {lights.map((l, i) => (
-        <li
-          key={i}
-          aria-label={`${l.label}: ${l.satisfied ? "聞き終えた" : "まだ"}`}
-          className={`size-2.5 rounded-full transition-colors duration-(--dur-slow) ease-(--ease-out) ${
-            l.satisfied ? "bg-accent" : "border border-ink-faint"
-          }`}
-        />
-      ))}
-    </ol>
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label="これまでの回答を見る"
+      className="-m-2 flex items-center gap-2 rounded-sm p-2 transition-colors duration-(--dur-fast) hover:bg-paper-3 active:bg-paper-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+    >
+      <span className="flex items-center gap-2" aria-hidden="true">
+        {lights.map((l, i) => (
+          <span
+            key={i}
+            className={`size-2.5 rounded-full transition-colors duration-(--dur-slow) ease-(--ease-out) ${
+              l.satisfied ? "bg-accent" : "border border-ink-faint"
+            }`}
+          />
+        ))}
+      </span>
+      <span className="sr-only">{summary}</span>
+      <span className="text-xs text-ink-faint tabular-nums">{answeredCount}問</span>
+    </button>
   );
 }
 
 function QuestionView({
   q,
   onAnswer,
+  initialValue,
+  initialFreeText,
 }: {
   q: PublicQuestion;
   onAnswer: (q: PublicQuestion, value: string, freeText?: string) => void;
+  initialValue?: string | null;
+  initialFreeText?: string | null;
 }) {
-  const [selected, setSelected] = useState<string | null>(null);
-  const [escapeOpen, setEscapeOpen] = useState(false);
-  const [freeText, setFreeText] = useState("");
-  const [text, setText] = useState("");
+  const [selected, setSelected] = useState<string | null>(initialValue ?? null);
+  const [escapeOpen, setEscapeOpen] = useState(initialValue === ESCAPE_OPTION);
+  const [freeText, setFreeText] = useState(initialFreeText ?? "");
+  const [text, setText] = useState(q.kind === "text" ? (initialValue ?? "") : "");
 
   const choose = (value: string) => {
     setSelected(value);
@@ -634,6 +722,122 @@ function DoneView({
             はじめから
           </Link>
         </p>
+      </div>
+    </div>
+  );
+}
+
+function HistorySheet({
+  overlay,
+  pendingExtra,
+  onClose,
+  onSetOverlay,
+  onSubmit,
+}: {
+  overlay: Overlay;
+  pendingExtra: number;
+  onClose: () => void;
+  onSetOverlay: (o: Overlay | null) => void;
+  onSubmit: (q: PublicQuestion, value: string, freeText?: string) => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="これまでの回答" className="fixed inset-0 z-50 bg-paper overflow-y-auto">
+      <div className="flex flex-col w-full max-w-md mx-auto px-6 pt-safe pb-safe min-h-full">
+        <div className="flex items-center justify-between py-3">
+          <p className="text-xs text-ink-muted">これまでの回答</p>
+          <button type="button" autoFocus onClick={onClose} className={textBtn}>
+            閉じる
+          </button>
+        </div>
+
+        {overlay.kind === "loading" && (
+          <p className="breathe mt-8 text-[15px] text-ink-muted" aria-live="polite">
+            読み込んでいます
+          </p>
+        )}
+
+        {overlay.kind === "list" && (
+          <ol className="mt-4 border-y border-rule">
+            {overlay.items.map((item, i) => {
+              const discard = overlay.items.length - 1 - i + pendingExtra;
+              const confirming = overlay.confirming === i;
+              return (
+                <li key={item.question.id} className="border-t border-rule first:border-t-0 py-4">
+                  <div className="rise flex items-start justify-between gap-3" style={{ animationDelay: `${i * 40}ms` }}>
+                    <div className="min-w-0">
+                      <p className="font-serif text-[17px] leading-snug text-ink">{item.question.text}</p>
+                      <p className="mt-1 text-[15px] text-ink-muted">
+                        「{item.value}」
+                        {item.freeText && `（${item.freeText}）`}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onSetOverlay(
+                          discard === 0
+                            ? { kind: "edit", items: overlay.items, item, discard: 0 }
+                            : { kind: "list", items: overlay.items, confirming: i },
+                        )
+                      }
+                      className={`${textBtn} shrink-0 text-sm`}
+                    >
+                      書き直す
+                    </button>
+                  </div>
+                  {confirming && (
+                    <div className="rise mt-3 rounded-md bg-paper-3 px-4 py-3 space-y-3">
+                      <p className="text-sm text-ink-muted">
+                        ここから先の{discard}問は、いったん白紙に戻ります。
+                      </p>
+                      <div className="flex items-center gap-4">
+                        <button
+                          type="button"
+                          onClick={() => onSetOverlay({ kind: "edit", items: overlay.items, item, discard })}
+                          className={`${textBtn} text-sm`}
+                        >
+                          書き直す
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onSetOverlay({ kind: "list", items: overlay.items, confirming: null })}
+                          className={`${textBtn} text-sm text-ink-faint`}
+                        >
+                          やめる
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+
+        {overlay.kind === "edit" && (
+          <div className="flex-1 flex flex-col pt-4">
+            <button
+              type="button"
+              onClick={() => onSetOverlay({ kind: "list", items: overlay.items, confirming: null })}
+              className={`${textBtn} self-start text-sm text-ink-faint`}
+            >
+              やめる
+            </button>
+            <QuestionView
+              q={overlay.item.question}
+              onAnswer={onSubmit}
+              initialValue={overlay.item.value}
+              initialFreeText={overlay.item.freeText}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
