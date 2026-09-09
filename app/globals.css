@@ -1,4 +1,4 @@
-/* Hallmark · app-scope (survey flow) · genre: editorial · tone: quiet, letter-like · anchor hue: teal-green 200° */
+/* Hallmark · app-scope (survey flow) · genre: editorial · tone: quiet, letter-like · anchor hue: burnt orange 40° */
 @import "tailwindcss";
 
 :root {
@@ -9,11 +9,11 @@
   --ink-muted: oklch(50% 0.02 60);
   --ink-faint: oklch(68% 0.015 65);
   --rule: oklch(88% 0.012 75);
-  --accent: oklch(44% 0.07 200);
+  --accent: oklch(45% 0.13 38);
   --accent-ink: oklch(99% 0.005 85);
-  --accent-soft: oklch(93.5% 0.028 200);
-  --danger: oklch(52% 0.16 25);
-  --focus: oklch(55% 0.11 200);
+  --accent-soft: oklch(94% 0.04 46);
+  --danger: oklch(52% 0.17 15);
+  --focus: oklch(50% 0.14 38);
 
   --background: var(--paper);
   --foreground: var(--ink);
@@ -37,11 +37,11 @@
     --ink-muted: oklch(70% 0.015 70);
     --ink-faint: oklch(52% 0.012 65);
     --rule: oklch(33% 0.012 60);
-    --accent: oklch(74% 0.08 200);
-    --accent-ink: oklch(18% 0.02 200);
-    --accent-soft: oklch(30% 0.045 200);
-    --danger: oklch(70% 0.15 25);
-    --focus: oklch(78% 0.1 200);
+    --accent: oklch(72% 0.14 42);
+    --accent-ink: oklch(18% 0.03 40);
+    --accent-soft: oklch(32% 0.06 42);
+    --danger: oklch(68% 0.15 15);
+    --focus: oklch(76% 0.13 42);
   }
 }
 
