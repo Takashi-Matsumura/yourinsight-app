@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { StatusBadge } from "../ui";
+import { BackButton, StatusBadge } from "../ui";
 import type { Survey } from "@/lib/types";
 
 export function SurveyNav({ survey, current }: { survey: Survey; current: "edit" | "responses" | "analysis" }) {
@@ -17,11 +17,7 @@ export function SurveyNav({ survey, current }: { survey: Survey; current: "edit"
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <Link href="/admin" className="text-sm text-ink-muted hover:text-ink">
-          ← アンケート
-        </Link>
-      </div>
-      <div className="flex items-center gap-3">
+        <BackButton href="/admin" label="アンケート一覧に戻る" />
         <h1 className="font-serif text-2xl text-ink">{survey.title}</h1>
         <StatusBadge status={survey.status} />
       </div>

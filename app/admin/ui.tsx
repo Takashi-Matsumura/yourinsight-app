@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ComponentProps, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 export const inputCls =
   "w-full min-h-11 rounded-md border border-rule bg-paper-2 px-3 text-ink placeholder:text-ink-faint transition-colors duration-(--dur-fast) focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus disabled:opacity-50";
@@ -59,6 +59,16 @@ export function StatusBadge({ status }: { status: "draft" | "published" | "close
   return <span className={`inline-block rounded-sm px-2 py-0.5 text-xs ${cls}`}>{label}</span>;
 }
 
-export function BackLink(props: ComponentProps<typeof Link>) {
-  return <Link {...props} className={`${btnText} text-sm`} />;
+export function BackButton({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-rule text-ink-muted transition-colors duration-(--dur-fast) hover:border-accent hover:bg-accent-soft hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+    >
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M10 3 5 8l5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </Link>
+  );
 }
