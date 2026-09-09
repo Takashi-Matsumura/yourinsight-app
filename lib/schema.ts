@@ -15,6 +15,9 @@ export function migrate(d: DatabaseSync): void {
       "ALTER TABLE surveys ADD COLUMN cta_text TEXT NOT NULL DEFAULT 'ブースのスタッフにお尋ねください'",
     );
   }
+  if (!hasColumn("surveys", "viewpoint")) {
+    d.exec("ALTER TABLE surveys ADD COLUMN viewpoint TEXT NOT NULL DEFAULT 'individual'");
+  }
 }
 
 export const SCHEMA_SQL = `
@@ -29,6 +32,7 @@ CREATE TABLE IF NOT EXISTS surveys (
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','closed')),
   seed_questions TEXT,
   cta_text TEXT NOT NULL DEFAULT 'ブースのスタッフにお尋ねください',
+  viewpoint TEXT NOT NULL DEFAULT 'individual' CHECK (viewpoint IN ('individual','organization')),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

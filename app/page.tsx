@@ -1,4 +1,4 @@
-/* Hallmark · genre: editorial · macrostructure: Marquee Hero (single-viewport, mobile-only — CTA visible immediately, no true below-fold on a kiosk screen) · theme: locked (existing app tokens, burnt-orange accent hue 38) · enrichment: none (typography + one CTA card) · nav: none · footer: none */
+/* Hallmark · genre: editorial · macrostructure: Marquee Hero (single-viewport, mobile-only — CTA visible immediately, no true below-fold on a kiosk screen) · theme: locked (existing app tokens, burnt-orange accent hue 38) · enrichment: none (typography + equal-weight CTA cards) · nav: none · footer: none */
 import Link from "next/link";
 import { connection } from "next/server";
 import { listSurveys } from "@/lib/repo/surveys";
@@ -24,32 +24,43 @@ export default async function Home() {
             公開中のアンケートはまだありません。
           </p>
         ) : (
-          surveys.map((s, i) =>
-            i === 0 ? (
-              <SurveyHero key={s.id} id={s.id} title={s.title} introText={s.intro_text} />
-            ) : (
-              <SurveySecondary
-                key={s.id}
-                id={s.id}
-                title={s.title}
-                delayMs={80 + i * 40}
-              />
-            ),
-          )
+          surveys.map((s, i) => (
+            <SurveyCard
+              key={s.id}
+              id={s.id}
+              title={s.title}
+              introText={s.intro_text}
+              viewpointLabel={s.viewpoint === "organization" ? "チーム・組織の視点で" : "あなた自身の視点で"}
+              delayMs={80 + i * 60}
+            />
+          ))
         )}
       </section>
     </main>
   );
 }
 
-function SurveyHero({ id, title, introText }: { id: string; title: string; introText: string }) {
+function SurveyCard({
+  id,
+  title,
+  introText,
+  viewpointLabel,
+  delayMs,
+}: {
+  id: string;
+  title: string;
+  introText: string;
+  viewpointLabel: string;
+  delayMs: number;
+}) {
   return (
     <Link
       href={`/s/${id}`}
       className="rise group block rounded-md bg-accent px-5 py-6 text-accent-ink transition-[filter,transform] duration-(--dur-fast) ease-(--ease-out) hover:brightness-110 active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-      style={{ animationDelay: "80ms" }}
+      style={{ animationDelay: `${delayMs}ms` }}
     >
-      <p className="font-serif text-2xl leading-snug break-words">{title}</p>
+      <p className="text-xs font-medium text-accent-ink/70">{viewpointLabel}</p>
+      <p className="mt-1 font-serif text-2xl leading-snug break-words">{title}</p>
       {introText && (
         <p className="mt-2 text-sm leading-relaxed text-accent-ink/80 line-clamp-2">{introText}</p>
       )}
@@ -64,21 +75,6 @@ function SurveyHero({ id, title, introText }: { id: string; title: string; intro
           </svg>
         </span>
       </div>
-    </Link>
-  );
-}
-
-function SurveySecondary({ id, title, delayMs }: { id: string; title: string; delayMs: number }) {
-  return (
-    <Link
-      href={`/s/${id}`}
-      className="rise flex items-center justify-between gap-3 rounded-md border border-rule px-5 py-4 text-ink transition-colors duration-(--dur-fast) hover:border-accent hover:text-accent focus-visible:border-accent focus-visible:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-      style={{ animationDelay: `${delayMs}ms` }}
-    >
-      <span className="font-serif text-lg break-words">{title}</span>
-      <span aria-hidden className="shrink-0 text-ink-faint">
-        →
-      </span>
     </Link>
   );
 }

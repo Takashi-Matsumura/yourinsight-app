@@ -21,11 +21,23 @@ import {
   setSurveySolutions,
   type SolutionInput,
 } from "@/lib/repo/solutions";
-import type { GeneratedQuestion, LlmSettings, QuestionKind, Solution, SurveyStatus } from "@/lib/types";
+import type {
+  GeneratedQuestion,
+  LlmSettings,
+  QuestionKind,
+  Solution,
+  SurveyStatus,
+  SurveyViewpoint,
+} from "@/lib/types";
+
+function toViewpoint(v: FormDataEntryValue | string | null | undefined): SurveyViewpoint {
+  return v === "organization" ? "organization" : "individual";
+}
 
 export interface DesignDraft {
   purpose: string;
   audience: string;
+  viewpoint: SurveyViewpoint;
   title: string;
   intro_text: string;
   solution_ids: string[];
@@ -44,6 +56,7 @@ export async function createSurveyFromDesign(draft: DesignDraft): Promise<void> 
     purpose: draft.purpose,
     audience: draft.audience,
     intro_text: draft.intro_text,
+    viewpoint: toViewpoint(draft.viewpoint),
   });
   replaceTopics(
     survey.id,
@@ -70,7 +83,8 @@ export async function createSurveyFromDesign(draft: DesignDraft): Promise<void> 
 export async function createBlankSurvey(formData: FormData): Promise<void> {
   const purpose = String(formData.get("purpose") ?? "").trim();
   const audience = String(formData.get("audience") ?? "").trim();
-  const survey = createSurvey({ title: "無題のアンケート", purpose, audience, intro_text: "" });
+  const viewpoint = toViewpoint(formData.get("viewpoint"));
+  const survey = createSurvey({ title: "無題のアンケート", purpose, audience, intro_text: "", viewpoint });
   revalidatePath("/admin");
   redirect(`/admin/${survey.id}`);
 }
@@ -84,6 +98,7 @@ export async function updateSurveyAction(surveyId: string, formData: FormData): 
     max_per_topic: clampInt(formData.get("max_per_topic"), 1, 6, 3),
     hard_cap: clampInt(formData.get("hard_cap"), 3, 40, 15),
     cta_text: String(formData.get("cta_text") ?? "").trim() || "ブースのスタッフにお尋ねください",
+    viewpoint: toViewpoint(formData.get("viewpoint")),
   });
   revalidatePath(`/admin/${surveyId}`);
 }

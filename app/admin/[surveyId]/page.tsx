@@ -49,6 +49,12 @@ export default async function SurveyEditPage(props: PageProps<"/admin/[surveyId]
           <Field label="題名">
             <input name="title" defaultValue={survey.title} className={inputCls} required maxLength={60} />
           </Field>
+          <Field label="視点" hint="質問の主語が変わります。既存の回答には影響しません。">
+            <select name="viewpoint" defaultValue={survey.viewpoint} className={inputCls}>
+              <option value="individual">あなた自身の視点で</option>
+              <option value="organization">チーム・組織の視点で</option>
+            </select>
+          </Field>
           <Field label="調査の目的" hint="AIはこの文章を毎回の質問生成で参照します。">
             <textarea name="purpose" defaultValue={survey.purpose} rows={4} className={textareaCls} />
           </Field>

@@ -34,6 +34,9 @@ export default async function AdminHome() {
                 className="flex items-center justify-between gap-4 py-4 hover:bg-paper-3 -mx-3 px-3 rounded-sm transition-colors duration-(--dur-fast)"
               >
                 <div className="min-w-0">
+                  <p className="text-xs text-ink-faint">
+                    {s.viewpoint === "organization" ? "チーム・組織の視点" : "個人の視点"}
+                  </p>
                   <p className="font-serif text-lg text-ink truncate">{s.title}</p>
                   <p className="mt-0.5 text-sm text-ink-muted truncate">{s.purpose}</p>
                 </div>

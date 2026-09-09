@@ -8,7 +8,7 @@ import { extractAllStrings, extractPartialString } from "@/lib/llm/partial";
 import { getLlmSettings } from "@/lib/repo/settings";
 import { getSolution } from "@/lib/repo/solutions";
 import { solutionIdFromKey } from "@/lib/survey/engine";
-import type { Solution } from "@/lib/types";
+import type { Solution, SurveyViewpoint } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -30,17 +30,19 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as {
     purpose?: string;
     audience?: string;
+    viewpoint?: string;
     solutionIds?: string[];
   };
   const purpose = (body.purpose ?? "").trim();
   if (!purpose) return Response.json({ error: "purpose required" }, { status: 400 });
   const audience = (body.audience ?? "").trim();
+  const viewpoint: SurveyViewpoint = body.viewpoint === "organization" ? "organization" : "individual";
   const solutions = (body.solutionIds ?? [])
     .map((id) => getSolution(id))
     .filter((s): s is Solution => s !== null);
   const solutionKeys = solutions.map((_, i) => `S${i + 1}`);
   const settings = getLlmSettings();
-  const messages = surveyDesignMessages({ purpose, audience, solutions });
+  const messages = surveyDesignMessages({ purpose, audience, viewpoint, solutions });
   const schema = surveyDesignSchema(solutionKeys);
 
   return sseResponse(async (send, signal) => {
