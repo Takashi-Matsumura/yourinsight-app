@@ -135,6 +135,10 @@ export function fallbackFor(ctx: EngineContext, coverage: TopicCoverage[], qa: Q
   return { ...t.fallback_question, topic_id: t.id, satisfied_topic_ids: [] };
 }
 
+export function appliedSatisfiedIds(generated: GeneratedQuestion): string[] {
+  return generated.satisfied_topic_ids.filter((id) => id !== generated.topic_id);
+}
+
 export function persistQuestion(
   ctx: EngineContext,
   generated: GeneratedQuestion,
@@ -152,6 +156,7 @@ export function persistQuestion(
     options: generated.options,
     source,
     latency_ms: latencyMs,
+    satisfied_topic_ids: source === "llm" ? appliedSatisfiedIds(generated) : [],
   });
   if (generated.topic_id) markAsked(ctx.session.id, generated.topic_id);
   return q;
@@ -286,8 +291,7 @@ export async function generateQuestionOnce(
 }
 
 export function applySatisfied(ctx: EngineContext, generated: GeneratedQuestion): void {
-  const ids = generated.satisfied_topic_ids.filter((id) => id !== generated.topic_id);
-  markSatisfied(ctx.session.id, ids);
+  markSatisfied(ctx.session.id, appliedSatisfiedIds(generated));
 }
 
 export function snapshot(ctx: EngineContext) {

@@ -8,7 +8,7 @@ import {
   type EngineContext,
 } from "@/lib/survey/engine";
 import type { Question, Session } from "@/lib/types";
-import type { Light, PublicQuestion, QuestionPayload, RunnerInitial } from "@/lib/survey/public";
+import type { HistoryPayload, Light, PublicQuestion, QuestionPayload, RunnerInitial } from "@/lib/survey/public";
 
 export function startSession(surveyId: string): Session {
   const survey = getSurvey(surveyId);
@@ -33,7 +33,19 @@ export function lightsFor(ctx: EngineContext): { lights: Light[]; remaining: num
 }
 
 export function questionPayload(ctx: EngineContext, q: Question): QuestionPayload {
-  return { question: toPublicQuestion(q), ...lightsFor(ctx) };
+  const answered = listQA(ctx.session.id).filter((x) => x.answer).length;
+  return { question: toPublicQuestion(q), ...lightsFor(ctx), answered };
+}
+
+export function historyPayload(ctx: EngineContext): HistoryPayload {
+  const items = listQA(ctx.session.id)
+    .filter((x) => x.answer)
+    .map((x) => ({
+      question: toPublicQuestion(x.question),
+      value: x.answer!.value,
+      freeText: x.answer!.free_text,
+    }));
+  return { items };
 }
 
 export function runnerInitial(ctx: EngineContext): RunnerInitial {

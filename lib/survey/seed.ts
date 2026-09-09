@@ -15,6 +15,7 @@ function asQuestion(g: GeneratedQuestion): Question {
     source: "seed",
     latency_ms: null,
     created_at: "",
+    satisfied_topic_ids: [],
   };
 }
 

@@ -80,6 +80,7 @@ export interface Question {
   source: QuestionSource;
   latency_ms: number | null;
   created_at: string;
+  satisfied_topic_ids: string[];
 }
 
 export interface Answer {

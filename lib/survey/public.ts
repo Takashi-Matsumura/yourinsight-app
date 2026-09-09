@@ -18,6 +18,17 @@ export interface QuestionPayload {
   question: PublicQuestion;
   lights: Light[];
   remaining: number;
+  answered: number;
+}
+
+export interface PublicAnsweredQuestion {
+  question: PublicQuestion;
+  value: string;
+  freeText: string | null;
+}
+
+export interface HistoryPayload {
+  items: PublicAnsweredQuestion[];
 }
 
 export interface RunnerInitial {
