@@ -65,6 +65,62 @@ npx wrangler secret put CF_ACCESS_CLIENT_ID
 npx wrangler secret put CF_ACCESS_CLIENT_SECRET
 ```
 
+### ローカルLLMをCloudflare Tunnelで公開する手順
+
+1. **cloudflaredのインストールとログイン**
+   ```bash
+   brew install cloudflared
+   cloudflared tunnel login   # ブラウザで対象ドメインを選択・認可
+   ```
+2. **Tunnelの作成とingress設定**
+   ```bash
+   cloudflared tunnel create <tunnel名>
+   ```
+   `~/.cloudflared/config.yml` を作成する。
+   ```yml
+   tunnel: <tunnel ID>
+   credentials-file: /Users/<user>/.cloudflared/<tunnel ID>.json
+
+   ingress:
+     - hostname: llm.<あなたのドメイン>
+       service: http://localhost:8080
+     - service: http_status:404
+   ```
+3. **DNSレコードの追加**
+   ```bash
+   cloudflared tunnel route dns <tunnel名> llm.<あなたのドメイン>
+   ```
+4. **マシン起動時から常駐させる（ログイン前から起動する場合）**
+   ユーザーのLaunchAgentではなく、root権限のLaunchDaemonとして登録する。`--config`で設定ファイルの場所を明示しないと、root実行時に`~/.cloudflared/`が`/var/root/.cloudflared/`を指してしまい認証情報が見つからないので注意。
+   ```bash
+   sudo /usr/libexec/PlistBuddy -c "Add :Label string com.cloudflare.cloudflared" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   sudo /usr/libexec/PlistBuddy -c "Add :ProgramArguments array" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   sudo /usr/libexec/PlistBuddy -c "Add :ProgramArguments:0 string /opt/homebrew/bin/cloudflared" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   sudo /usr/libexec/PlistBuddy -c "Add :ProgramArguments:1 string --config" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   sudo /usr/libexec/PlistBuddy -c "Add :ProgramArguments:2 string /Users/<user>/.cloudflared/config.yml" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   sudo /usr/libexec/PlistBuddy -c "Add :ProgramArguments:3 string tunnel" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   sudo /usr/libexec/PlistBuddy -c "Add :ProgramArguments:4 string run" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   sudo /usr/libexec/PlistBuddy -c "Add :RunAtLoad bool true" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   sudo /usr/libexec/PlistBuddy -c "Add :StandardOutPath string /Library/Logs/com.cloudflare.cloudflared.out.log" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   sudo /usr/libexec/PlistBuddy -c "Add :StandardErrorPath string /Library/Logs/com.cloudflare.cloudflared.err.log" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   sudo /usr/libexec/PlistBuddy -c "Add :KeepAlive:SuccessfulExit bool false" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   sudo /usr/libexec/PlistBuddy -c "Add :ThrottleInterval integer 5" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   sudo chown root:wheel /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   sudo chmod 644 /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   sudo launchctl bootstrap system /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   ```
+   （ログイン中だけ動けばよい場合は `cloudflared service install` で作成されるユーザーLaunchAgentのままでよいが、`ProgramArguments`に`tunnel run <ID>`が入っているか確認すること）
+5. **Cloudflare Accessで保護する**（Zero Trustダッシュボード）
+   1. 「Access コントロール」→「サービス資格情報」→「サービストークンを作成する」
+   2. 「Access コントロール」→「ポリシー」→ アクション「サービス認証」、含める条件に上記トークンを指定したポリシーを作成
+   3. 「Access コントロール」→「アプリケーション」→「Self-hosted」で `llm.<あなたのドメイン>` を登録し、作成したポリシーを紐付け
+   4. 発行されたClient ID / Client Secretを、上記の `wrangler secret put` でWorkerに設定
+6. **動作確認**
+   ```bash
+   curl -o /dev/null -w '%{http_code}\n' https://llm.<あなたのドメイン>/v1/models   # 403なら保護成功
+   ```
+   `/admin/settings` の疎通テストで「サーバに接続」「モデル名一致」「JSON Schema構造化出力」がすべて成功すれば完了。
+
 ## 使い方
 
 ### アンケートの作成・管理（`/admin`）
