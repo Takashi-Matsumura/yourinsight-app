@@ -27,23 +27,23 @@ function reflectionText(raw: string | null): string | null {
 
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/admin/surveys/[surveyId]/analysis">) {
   const { surveyId } = await ctx.params;
-  const survey = getSurvey(surveyId);
+  const survey = await getSurvey(surveyId);
   if (!survey) return Response.json({ error: "not found" }, { status: 404 });
-  const topics = listTopics(surveyId);
-  const sessions = listSessions(surveyId)
-    .filter((s) => s.status === "completed")
-    .slice(0, MAX_SESSIONS)
-    .map((s) => ({
-      qa: listQA(s.id).filter((x) => x.answer),
+  const [topics, sessionList] = await Promise.all([listTopics(surveyId), listSessions(surveyId)]);
+  const completedSessions = sessionList.filter((s) => s.status === "completed").slice(0, MAX_SESSIONS);
+  const sessionsWithQa = await Promise.all(
+    completedSessions.map(async (s) => ({
+      qa: (await listQA(s.id)).filter((x) => x.answer),
       reflection: reflectionText(s.reflection),
       feedback: s.reflection_feedback,
-    }))
-    .filter((s) => s.qa.length > 0);
+    })),
+  );
+  const sessions = sessionsWithQa.filter((s) => s.qa.length > 0);
   if (sessions.length === 0) return Response.json({ error: "完了した回答がありません" }, { status: 400 });
 
-  const settings = getLlmSettings();
+  const settings = await getLlmSettings();
   const keys = topics.map((_, i) => `T${i + 1}`);
-  const solutions = getSurveySolutions(surveyId);
+  const solutions = await getSurveySolutions(surveyId);
   const solutionKeys = solutions.map((_, i) => `S${i + 1}`);
   const messages = analysisMessages({ survey, topics, sessions, solutions });
 
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/admin/surve
         return { ...i, topic_id: m ? (topics[Number(m[1]) - 1]?.id ?? null) : null };
       }),
     };
-    saveAnalysis(surveyId, analysis, sessions.length);
+    await saveAnalysis(surveyId, analysis, sessions.length);
     send("analysis", analysis);
   }, req.signal);
 }

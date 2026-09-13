@@ -33,7 +33,7 @@ interface Body {
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[sessionId]/next">) {
   const { sessionId } = await ctx.params;
   const body = (await req.json().catch(() => ({}))) as Body;
-  const ectx = loadContext(sessionId);
+  const ectx = await loadContext(sessionId);
   if (!ectx) return Response.json({ error: "session not found" }, { status: 404 });
 
   return sseResponse(async (send, signal) => {
@@ -43,15 +43,15 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[se
     }
 
     if (body.questionId && typeof body.value === "string") {
-      const q = getQuestion(body.questionId);
+      const q = await getQuestion(body.questionId);
       if (q && q.session_id === sessionId) {
-        const discarded = countAnswersAfter(sessionId, q.order_index);
+        const discarded = await countAnswersAfter(sessionId, q.order_index);
         if (discarded > 0 && !body.rewind) {
           send("error", { message: "この回答はもう送信されています" });
           return;
         }
-        truncateSessionAfter(sessionId, q.order_index);
-        upsertAnswer({
+        await truncateSessionAfter(sessionId, q.order_index);
+        await upsertAnswer({
           question_id: q.id,
           session_id: sessionId,
           value: body.value.trim().slice(0, 500),
@@ -61,17 +61,17 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[se
       // q が見つからない場合は何もせず、下の snapshot() が現在の pending 質問を返す
     }
 
-    const { qa, coverage } = snapshot(ectx);
+    const { qa, coverage } = await snapshot(ectx);
 
     const pending = qa.find((x) => !x.answer);
     if (pending) {
-      send("question", questionPayload(ectx, pending.question));
+      send("question", await questionPayload(ectx, pending.question));
       return;
     }
 
     const reason = completionReason(ectx, coverage, qa.length);
     if (reason) {
-      completeSession(sessionId, false);
+      await completeSession(sessionId, false);
       send("complete", { reason });
       return;
     }
@@ -80,8 +80,8 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[se
 
     const seed = seedFor(ectx, qa);
     if (seed) {
-      const q = persistQuestion(ectx, seed, "seed", null, orderIndex);
-      send("question", questionPayload(ectx, q));
+      const q = await persistQuestion(ectx, seed, "seed", null, orderIndex);
+      send("question", await questionPayload(ectx, q));
       return;
     }
 
@@ -95,29 +95,29 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[se
         onDelta: (partial) => send("token", partial),
       });
       if (signal.aborted) return;
-      if (listQA(sessionId).length !== orderIndex) return; // 別リクエストが状況を進めていた
-      applySatisfied(ectx, r.generated);
-      const after = getCoverage(sessionId);
+      if ((await listQA(sessionId)).length !== orderIndex) return; // 別リクエストが状況を進めていた
+      await applySatisfied(ectx, r.generated);
+      const after = await getCoverage(sessionId);
       const reasonAfter = r.done ? "all_satisfied" : completionReason(ectx, after, qa.length);
       if (reasonAfter) {
-        completeSession(sessionId, false);
+        await completeSession(sessionId, false);
         send("complete", { reason: reasonAfter });
         return;
       }
-      const q = persistQuestion(ectx, r.generated, "llm", r.latencyMs, orderIndex);
-      send("question", questionPayload(ectx, q));
+      const q = await persistQuestion(ectx, r.generated, "llm", r.latencyMs, orderIndex);
+      send("question", await questionPayload(ectx, q));
     } catch (e) {
       if (signal.aborted) return;
-      if (listQA(sessionId).length !== orderIndex) return; // 別リクエストが状況を進めていた
+      if ((await listQA(sessionId)).length !== orderIndex) return; // 別リクエストが状況を進めていた
       console.error("[session/next] generation failed:", e instanceof Error ? e.message : e);
       const fb = fallbackFor(ectx, coverage, qa);
       if (!fb) {
-        completeSession(sessionId, false);
+        await completeSession(sessionId, false);
         send("complete", { reason: "all_satisfied" });
         return;
       }
-      const q = persistQuestion(ectx, fb, "fallback", null, orderIndex);
-      send("question", questionPayload(ectx, q));
+      const q = await persistQuestion(ectx, fb, "fallback", null, orderIndex);
+      send("question", await questionPayload(ectx, q));
     }
   }, req.signal);
 }

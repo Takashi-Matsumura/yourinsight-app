@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   await connection();
-  const surveys = listSurveys().filter((s) => s.status === "published");
+  const allSurveys = await listSurveys();
+  const surveys = allSurveys.filter((s) => s.status === "published");
 
   return (
     <main className="flex flex-1 flex-col px-6 pt-safe pb-safe max-w-md w-full mx-auto">

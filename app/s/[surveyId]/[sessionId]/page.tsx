@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function SessionPage(props: PageProps<"/s/[surveyId]/[sessionId]">) {
   await connection();
   const { surveyId, sessionId } = await props.params;
-  const ctx = loadContext(sessionId);
+  const ctx = await loadContext(sessionId);
   if (!ctx || ctx.survey.id !== surveyId) notFound();
-  return <SurveyRunner initial={runnerInitial(ctx)} />;
+  return <SurveyRunner initial={await runnerInitial(ctx)} />;
 }

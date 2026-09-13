@@ -51,14 +51,14 @@ export interface DesignDraft {
 }
 
 export async function createSurveyFromDesign(draft: DesignDraft): Promise<void> {
-  const survey = createSurvey({
+  const survey = await createSurvey({
     title: draft.title.trim() || "無題のアンケート",
     purpose: draft.purpose,
     audience: draft.audience,
     intro_text: draft.intro_text,
     viewpoint: toViewpoint(draft.viewpoint),
   });
-  replaceTopics(
+  await replaceTopics(
     survey.id,
     draft.topics.map((t) => ({
       label: t.label,
@@ -75,7 +75,7 @@ export async function createSurveyFromDesign(draft: DesignDraft): Promise<void> 
       },
     })),
   );
-  if (draft.solution_ids.length > 0) setSurveySolutions(survey.id, draft.solution_ids);
+  if (draft.solution_ids.length > 0) await setSurveySolutions(survey.id, draft.solution_ids);
   revalidatePath("/admin");
   redirect(`/admin/${survey.id}`);
 }
@@ -84,13 +84,13 @@ export async function createBlankSurvey(formData: FormData): Promise<void> {
   const purpose = String(formData.get("purpose") ?? "").trim();
   const audience = String(formData.get("audience") ?? "").trim();
   const viewpoint = toViewpoint(formData.get("viewpoint"));
-  const survey = createSurvey({ title: "無題のアンケート", purpose, audience, intro_text: "", viewpoint });
+  const survey = await createSurvey({ title: "無題のアンケート", purpose, audience, intro_text: "", viewpoint });
   revalidatePath("/admin");
   redirect(`/admin/${survey.id}`);
 }
 
 export async function updateSurveyAction(surveyId: string, formData: FormData): Promise<void> {
-  updateSurvey(surveyId, {
+  await updateSurvey(surveyId, {
     title: String(formData.get("title") ?? "").trim(),
     purpose: String(formData.get("purpose") ?? "").trim(),
     audience: String(formData.get("audience") ?? "").trim(),
@@ -104,12 +104,12 @@ export async function updateSurveyAction(surveyId: string, formData: FormData): 
 }
 
 export async function setSurveySolutionsAction(surveyId: string, solutionIds: string[]): Promise<void> {
-  setSurveySolutions(surveyId, solutionIds);
+  await setSurveySolutions(surveyId, solutionIds);
   revalidatePath(`/admin/${surveyId}`);
 }
 
 export async function createSolutionAction(input: SolutionInput): Promise<Solution> {
-  const solution = createSolution({
+  const solution = await createSolution({
     name: input.name.trim().slice(0, 40),
     pitch: input.pitch.trim().slice(0, 100),
     description: input.description.trim().slice(0, 300),
@@ -121,7 +121,7 @@ export async function createSolutionAction(input: SolutionInput): Promise<Soluti
 }
 
 export async function updateSolutionAction(id: string, input: SolutionInput): Promise<void> {
-  updateSolution(id, {
+  await updateSolution(id, {
     name: input.name.trim().slice(0, 40),
     pitch: input.pitch.trim().slice(0, 100),
     description: input.description.trim().slice(0, 300),
@@ -131,7 +131,7 @@ export async function updateSolutionAction(id: string, input: SolutionInput): Pr
 }
 
 export async function deleteSolutionAction(id: string): Promise<void> {
-  deleteSolution(id);
+  await deleteSolution(id);
   revalidatePath("/admin/solutions");
 }
 
@@ -148,14 +148,14 @@ export async function saveTopicsAction(surveyId: string, topics: TopicInput[]): 
           ? { ...t.fallback_question, text: t.fallback_question.text.trim() }
           : null,
     }));
-  replaceTopics(surveyId, cleaned);
+  await replaceTopics(surveyId, cleaned);
   revalidatePath(`/admin/${surveyId}`);
 }
 
 export async function updateSeedQ1Action(surveyId: string, q1: GeneratedQuestion): Promise<void> {
-  const survey = getSurvey(surveyId);
+  const survey = await getSurvey(surveyId);
   if (!survey) return;
-  const topics = listTopics(surveyId);
+  const topics = await listTopics(surveyId);
   const topicId = topics.some((t) => t.id === q1.topic_id) ? q1.topic_id : (topics[0]?.id ?? "");
   const cleaned: GeneratedQuestion = {
     lead: "",
@@ -165,24 +165,25 @@ export async function updateSeedQ1Action(surveyId: string, q1: GeneratedQuestion
     topic_id: topicId,
     satisfied_topic_ids: [],
   };
-  setSeedQuestions(surveyId, { q1: cleaned, q2_by_option: {} });
+  await setSeedQuestions(surveyId, { q1: cleaned, q2_by_option: {} });
   revalidatePath(`/admin/${surveyId}`);
 }
 
 export async function setStatusAction(surveyId: string, status: SurveyStatus): Promise<void> {
-  const survey = getSurvey(surveyId);
+  const survey = await getSurvey(surveyId);
   if (!survey) return;
   if (status === "published") {
-    if (listTopics(surveyId).length === 0) throw new Error("論点がありません");
+    const topics = await listTopics(surveyId);
+    if (topics.length === 0) throw new Error("論点がありません");
     if (!survey.seed_questions?.q1) throw new Error("最初の質問がありません");
   }
-  setSurveyStatus(surveyId, status);
+  await setSurveyStatus(surveyId, status);
   revalidatePath("/admin");
   revalidatePath(`/admin/${surveyId}`);
 }
 
 export async function deleteSurveyAction(surveyId: string): Promise<void> {
-  deleteSurvey(surveyId);
+  await deleteSurvey(surveyId);
   revalidatePath("/admin");
   redirect("/admin");
 }
@@ -194,7 +195,7 @@ export async function saveSettingsAction(formData: FormData): Promise<void> {
     temperature: clampFloat(formData.get("temperature"), 0, 2, 0.7),
     maxConcurrency: clampInt(formData.get("maxConcurrency"), 1, 8, 1),
   };
-  saveLlmSettings(settings);
+  await saveLlmSettings(settings);
   revalidatePath("/admin/settings");
 }
 

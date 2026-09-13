@@ -1,3 +1,4 @@
+import { env } from "cloudflare:workers";
 import type { LlmSettings } from "@/lib/types";
 
 export interface ChatMessage {
@@ -67,12 +68,20 @@ function combinedSignal(opts: CompleteOptions): AbortSignal {
   return opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
 }
 
+function accessHeaders(): Record<string, string> {
+  if (!env.CF_ACCESS_CLIENT_ID || !env.CF_ACCESS_CLIENT_SECRET) return {};
+  return {
+    "CF-Access-Client-Id": env.CF_ACCESS_CLIENT_ID,
+    "CF-Access-Client-Secret": env.CF_ACCESS_CLIENT_SECRET,
+  };
+}
+
 async function post(opts: CompleteOptions, stream: boolean): Promise<Response> {
   let res: Response;
   try {
     res = await fetch(endpoint(opts.settings), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...accessHeaders() },
       body: JSON.stringify(buildBody(opts, stream)),
       signal: combinedSignal(opts),
     });
@@ -90,7 +99,14 @@ async function post(opts: CompleteOptions, stream: boolean): Promise<Response> {
 export async function complete(opts: CompleteOptions): Promise<CompleteResult> {
   const started = Date.now();
   const res = await post(opts, false);
-  const json = await res.json();
+  const json = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      prompt_tokens_details?: { cached_tokens?: number };
+    };
+  };
   const content: string | undefined = json?.choices?.[0]?.message?.content;
   if (typeof content !== "string") {
     throw new LlmError("LLMの応答に content がありません");
@@ -158,11 +174,12 @@ export async function checkConnection(settings: LlmSettings): Promise<Connection
   };
   try {
     const res = await fetch(`${settings.baseUrl.replace(/\/+$/, "")}/v1/models`, {
+      headers: accessHeaders(),
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) throw new LlmError(`/v1/models が ${res.status} を返しました`, res.status);
-    const json = await res.json();
-    result.models = ((json?.data ?? []) as { id: string }[]).map((m) => m.id);
+    const json = (await res.json()) as { data?: { id: string }[] };
+    result.models = (json?.data ?? []).map((m) => m.id);
     result.modelFound = result.models.includes(settings.model);
   } catch (e) {
     result.error = e instanceof Error ? e.message : String(e);

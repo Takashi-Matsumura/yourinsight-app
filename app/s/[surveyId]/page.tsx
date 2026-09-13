@@ -9,12 +9,12 @@ export const dynamic = "force-dynamic";
 export default async function IntroPage(props: PageProps<"/s/[surveyId]">) {
   await connection();
   const { surveyId } = await props.params;
-  const survey = getSurvey(surveyId);
+  const survey = await getSurvey(surveyId);
   if (!survey) notFound();
 
   async function start() {
     "use server";
-    const session = startSession(surveyId);
+    const session = await startSession(surveyId);
     redirect(`/s/${surveyId}/${session.id}`);
   }
 

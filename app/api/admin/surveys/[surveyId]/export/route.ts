@@ -11,9 +11,10 @@ function csvCell(v: unknown): string {
 
 export async function GET(_req: NextRequest, ctx: RouteContext<"/api/admin/surveys/[surveyId]/export">) {
   const { surveyId } = await ctx.params;
-  const survey = getSurvey(surveyId);
+  const survey = await getSurvey(surveyId);
   if (!survey) return Response.json({ error: "not found" }, { status: 404 });
-  const topicLabel = new Map(listTopics(surveyId).map((t) => [t.id, t.label]));
+  const topics = await listTopics(surveyId);
+  const topicLabel = new Map(topics.map((t) => [t.id, t.label]));
 
   const header = [
     "session_id",
@@ -32,11 +33,11 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/api/admin/surve
     "recommended_reasons",
   ];
   const lines = [header.join(",")];
-  for (const s of listSessions(surveyId)) {
+  for (const s of await listSessions(surveyId)) {
     const reflection = parseReflection(s.reflection);
     const recommendedNames = (reflection?.recommended_solutions ?? []).map((r) => r.name).join("；");
     const recommendedReasons = (reflection?.recommended_solutions ?? []).map((r) => r.reason).join("；");
-    for (const { question, answer } of listQA(s.id)) {
+    for (const { question, answer } of await listQA(s.id)) {
       if (!answer) continue;
       lines.push(
         [

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   const override = (await req.json().catch(() => ({}))) as Partial<LlmSettings>;
-  const settings: LlmSettings = { ...getLlmSettings(), ...override };
+  const settings: LlmSettings = { ...(await getLlmSettings()), ...override };
   const result = await checkConnection(settings);
   return Response.json({ ...result, queue: queueSnapshot() });
 }
