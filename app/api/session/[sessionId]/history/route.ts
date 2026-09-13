@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(_req: NextRequest, ctx: RouteContext<"/api/session/[sessionId]/history">) {
   const { sessionId } = await ctx.params;
-  const ectx = loadContext(sessionId);
+  const ectx = await loadContext(sessionId);
   if (!ectx) return Response.json({ error: "session not found" }, { status: 404 });
-  return Response.json(historyPayload(ectx));
+  return Response.json(await historyPayload(ectx));
 }

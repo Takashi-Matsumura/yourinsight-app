@@ -19,14 +19,16 @@ const CONF: Record<string, { label: string; cls: string }> = {
 export default async function AnalysisPage(props: PageProps<"/admin/[surveyId]/analysis">) {
   await connection();
   const { surveyId } = await props.params;
-  const survey = getSurvey(surveyId);
+  const survey = await getSurvey(surveyId);
   if (!survey) notFound();
-  const topics = listTopics(surveyId);
+  const [topics, counts, analysis, solutions] = await Promise.all([
+    listTopics(surveyId),
+    countSessions(surveyId),
+    latestAnalysis(surveyId),
+    getSurveySolutions(surveyId),
+  ]);
   const topicLabel = new Map(topics.map((t) => [t.id, t.label]));
-  const counts = countSessions(surveyId);
-  const analysis = latestAnalysis(surveyId);
-  const solutions = getSurveySolutions(surveyId);
-  const solutionFit = aggregateSolutionFit(surveyId, solutions);
+  const solutionFit = await aggregateSolutionFit(surveyId, solutions);
 
   return (
     <div className="space-y-10">

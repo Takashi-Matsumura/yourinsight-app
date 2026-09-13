@@ -10,10 +10,11 @@ export const DEFAULT_LLM_SETTINGS: LlmSettings = {
 
 const KEY = "llm";
 
-export function getLlmSettings(): LlmSettings {
-  const row = db().prepare("SELECT value FROM settings WHERE key = ?").get(KEY) as
-    | { value: string }
-    | undefined;
+export async function getLlmSettings(): Promise<LlmSettings> {
+  const row = await db()
+    .prepare("SELECT value FROM settings WHERE key = ?")
+    .bind(KEY)
+    .first<{ value: string }>();
   if (!row) return { ...DEFAULT_LLM_SETTINGS };
   try {
     return { ...DEFAULT_LLM_SETTINGS, ...(JSON.parse(row.value) as Partial<LlmSettings>) };
@@ -22,10 +23,11 @@ export function getLlmSettings(): LlmSettings {
   }
 }
 
-export function saveLlmSettings(settings: LlmSettings): void {
-  db()
+export async function saveLlmSettings(settings: LlmSettings): Promise<void> {
+  await db()
     .prepare(
       "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
     )
-    .run(KEY, JSON.stringify(settings));
+    .bind(KEY, JSON.stringify(settings))
+    .run();
 }

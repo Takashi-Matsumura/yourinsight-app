@@ -16,27 +16,32 @@
 
 ## 技術構成
 
-- [Next.js 16](https://nextjs.org/)（App Router / Turbopack）
+- [Next.js 16](https://nextjs.org/)（App Router）
 - React 19 / TypeScript
 - Tailwind CSS v4
-- SQLite（Node.js標準の `node:sqlite` を使用。追加のネイティブ依存なし）
-- ローカルLLM（OpenAI互換の `/v1/chat/completions` エンドポイントを持つサーバであれば利用可能。[llama.cpp](https://github.com/ggml-org/llama.cpp) のサーバモードなどを想定）
+- [Cloudflare D1](https://developers.cloudflare.com/d1/)（SQLite互換）
+- [Cloudflare Workers](https://developers.cloudflare.com/workers/) へ [vinext](https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/) アダプタでデプロイ
+- ローカルLLM（OpenAI互換の `/v1/chat/completions` エンドポイントを持つサーバであれば利用可能。[llama.cpp](https://github.com/ggml-org/llama.cpp) のサーバモードなどを想定。社内LAN上のエッジAIサーバを [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) 経由で公開して利用する構成を想定）
 
 ## 必要な環境
 
-- Node.js 22.5 以降（`node:sqlite` を使用するため。開発は Node.js 24 系で確認）
+- Node.js 24 系
 - JSON Schema による構造化出力（`response_format.json_schema`）に対応した、OpenAI互換のLLM推論サーバ
   - `/v1/models` と `/v1/chat/completions` の両方に対応していること
   - モデルによっては構造化出力に対応していない場合があるため、`/admin/settings` の疎通テストで実際に動作確認することを推奨します
 
-## セットアップ
+## セットアップ（ローカル開発）
 
 ```bash
 npm install
-npm run dev
+npm run dev:vinext
 ```
 
-`http://localhost:3000` で起動します。初回アクセス時に SQLite データベースファイル（既定では `.data/yourinsight.db`）が自動的に作成されます。
+`http://localhost:3001` で起動します（workerdランタイム + ローカルD1のシミュレーション）。初回はローカルD1にマイグレーションを適用してください。
+
+```bash
+npx wrangler d1 migrations apply yourinsight --local
+```
 
 ### LLM接続の設定
 
@@ -44,10 +49,20 @@ npm run dev
 
 同時実行数は、推論サーバが同時に処理できるリクエスト数（例: llama.cpp サーバの `-np` オプション）に合わせて設定してください。
 
-### データベースの保存先を変更する場合
+## Cloudflareへのデプロイ
 
 ```bash
-DB_PATH=/path/to/your.db npm run dev
+npx wrangler d1 create yourinsight   # wrangler.jsonc の database_id を更新
+npx wrangler d1 migrations apply yourinsight --remote
+npm run build:vinext
+npm run deploy:vinext
+```
+
+社内LANなどローカルネットワーク上のLLMサーバを使う場合、Workersはグローバルエッジで実行されるため直接は到達できません。[Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) でLLMサーバのエンドポイントを`https://llm.<あなたのドメイン>`のようなホスト名として公開し、Cloudflare Access のサービストークンで保護してください。ヘッダー `CF-Access-Client-Id` / `CF-Access-Client-Secret` を次のシークレットとしてWorkerに設定すると、LLMクライアントが自動的に付与します。
+
+```bash
+npx wrangler secret put CF_ACCESS_CLIENT_ID
+npx wrangler secret put CF_ACCESS_CLIENT_SECRET
 ```
 
 ## 使い方
@@ -101,9 +116,9 @@ const nextConfig: NextConfig = {
 
 | コマンド | 内容 |
 |---|---|
-| `npm run dev` | 開発サーバを起動 |
-| `npm run build` | 本番ビルド |
-| `npm run start` | 本番サーバを起動 |
+| `npm run dev:vinext` | Cloudflare Workers向けの開発サーバを起動（workerd + ローカルD1） |
+| `npm run build:vinext` | Cloudflare Workers向けの本番ビルド |
+| `npm run deploy:vinext` | Cloudflare Workersへデプロイ |
 | `npm run lint` | ESLint を実行 |
 | `npm run typecheck` | 型チェック（`tsc --noEmit`）を実行 |
 
@@ -115,10 +130,11 @@ app/
   admin/                      管理画面
   api/                        ストリーミングAPI・管理API
 lib/
-  db.ts, schema.ts            SQLiteの接続とスキーマ
+  db.ts                       D1バインディングの取得
   repo/                       データアクセス層
   llm/                        LLMクライアント・プロンプト・スキーマ
   survey/                     アンケート生成エンジン
+migrations/                   D1のスキーマ定義（wrangler d1 migrations）
 ```
 
 ## 認証について

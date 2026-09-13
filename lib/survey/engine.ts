@@ -35,12 +35,12 @@ export interface EngineContext extends SurveyContext {
   session: Session;
 }
 
-export function loadContext(sessionId: string): EngineContext | null {
-  const session = getSession(sessionId);
+export async function loadContext(sessionId: string): Promise<EngineContext | null> {
+  const session = await getSession(sessionId);
   if (!session) return null;
-  const survey = getSurvey(session.survey_id);
+  const survey = await getSurvey(session.survey_id);
   if (!survey) return null;
-  return { survey, topics: listTopics(survey.id), session };
+  return { survey, topics: await listTopics(survey.id), session };
 }
 
 export function topicKey(topics: Topic[], topicId: string): string {
@@ -139,14 +139,14 @@ export function appliedSatisfiedIds(generated: GeneratedQuestion): string[] {
   return generated.satisfied_topic_ids.filter((id) => id !== generated.topic_id);
 }
 
-export function persistQuestion(
+export async function persistQuestion(
   ctx: EngineContext,
   generated: GeneratedQuestion,
   source: QuestionSource,
   latencyMs: number | null,
   orderIndex: number,
-): Question {
-  const q = insertQuestion({
+): Promise<Question> {
+  const q = await insertQuestion({
     session_id: ctx.session.id,
     order_index: orderIndex,
     topic_id: generated.topic_id || null,
@@ -158,7 +158,7 @@ export function persistQuestion(
     latency_ms: latencyMs,
     satisfied_topic_ids: source === "llm" ? appliedSatisfiedIds(generated) : [],
   });
-  if (generated.topic_id) markAsked(ctx.session.id, generated.topic_id);
+  if (generated.topic_id) await markAsked(ctx.session.id, generated.topic_id);
   return q;
 }
 
@@ -213,7 +213,7 @@ export interface GenerateResult {
 }
 
 export async function generateNextQuestion(ctx: EngineContext, opts: GenerateOptions): Promise<GenerateResult> {
-  const settings = getLlmSettings();
+  const settings = await getLlmSettings();
   const keys = ctx.topics.map((_, i) => `T${i + 1}`);
   const messages = nextQuestionMessages({
     survey: ctx.survey,
@@ -273,7 +273,7 @@ export async function generateQuestionOnce(
   qa: QA[],
   coverage: TopicCoverage[],
 ): Promise<GeneratedQuestion> {
-  const settings = getLlmSettings();
+  const settings = await getLlmSettings();
   const keys = ctx.topics.map((_, i) => `T${i + 1}`);
   const messages = nextQuestionMessages({
     survey: ctx.survey,
@@ -290,12 +290,11 @@ export async function generateQuestionOnce(
   return normalize(ctx, JSON.parse(r.content) as RawGenerated).generated;
 }
 
-export function applySatisfied(ctx: EngineContext, generated: GeneratedQuestion): void {
-  markSatisfied(ctx.session.id, appliedSatisfiedIds(generated));
+export async function applySatisfied(ctx: EngineContext, generated: GeneratedQuestion): Promise<void> {
+  await markSatisfied(ctx.session.id, appliedSatisfiedIds(generated));
 }
 
-export function snapshot(ctx: EngineContext) {
-  const qa = listQA(ctx.session.id);
-  const coverage = getCoverage(ctx.session.id);
+export async function snapshot(ctx: EngineContext) {
+  const [qa, coverage] = await Promise.all([listQA(ctx.session.id), getCoverage(ctx.session.id)]);
   return { qa, coverage };
 }

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NewSurveyPage() {
   await connection();
-  const solutions = listSolutions();
+  const solutions = await listSolutions();
 
   return (
     <div className="space-y-6">

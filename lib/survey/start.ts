@@ -10,15 +10,15 @@ import {
 import type { Question, Session } from "@/lib/types";
 import type { HistoryPayload, Light, PublicQuestion, QuestionPayload, RunnerInitial } from "@/lib/survey/public";
 
-export function startSession(surveyId: string): Session {
-  const survey = getSurvey(surveyId);
+export async function startSession(surveyId: string): Promise<Session> {
+  const survey = await getSurvey(surveyId);
   if (!survey || survey.status !== "published") {
     throw new Error("このアンケートは現在受け付けていません");
   }
-  const session = createSession(surveyId);
-  const ctx: EngineContext = { survey, topics: listTopics(surveyId), session };
+  const session = await createSession(surveyId);
+  const ctx: EngineContext = { survey, topics: await listTopics(surveyId), session };
   const seed = seedFor(ctx, []);
-  if (seed) persistQuestion(ctx, seed, "seed", null, 0);
+  if (seed) await persistQuestion(ctx, seed, "seed", null, 0);
   return session;
 }
 
@@ -26,19 +26,23 @@ export function toPublicQuestion(q: Question): PublicQuestion {
   return { id: q.id, index: q.order_index, lead: q.lead, text: q.text, kind: q.kind, options: q.options };
 }
 
-export function lightsFor(ctx: EngineContext): { lights: Light[]; remaining: number } {
-  const coverage = getCoverage(ctx.session.id);
+export async function lightsFor(
+  ctx: EngineContext,
+): Promise<{ lights: Light[]; remaining: number }> {
+  const coverage = await getCoverage(ctx.session.id);
   const lights = coverageView(ctx, coverage).map((c) => ({ label: c.label, satisfied: c.satisfied }));
   return { lights, remaining: estimateRemaining(ctx, coverage) };
 }
 
-export function questionPayload(ctx: EngineContext, q: Question): QuestionPayload {
-  const answered = listQA(ctx.session.id).filter((x) => x.answer).length;
-  return { question: toPublicQuestion(q), ...lightsFor(ctx), answered };
+export async function questionPayload(ctx: EngineContext, q: Question): Promise<QuestionPayload> {
+  const [qa, lightsResult] = await Promise.all([listQA(ctx.session.id), lightsFor(ctx)]);
+  const answered = qa.filter((x) => x.answer).length;
+  return { question: toPublicQuestion(q), ...lightsResult, answered };
 }
 
-export function historyPayload(ctx: EngineContext): HistoryPayload {
-  const items = listQA(ctx.session.id)
+export async function historyPayload(ctx: EngineContext): Promise<HistoryPayload> {
+  const qa = await listQA(ctx.session.id);
+  const items = qa
     .filter((x) => x.answer)
     .map((x) => ({
       question: toPublicQuestion(x.question),
@@ -48,10 +52,9 @@ export function historyPayload(ctx: EngineContext): HistoryPayload {
   return { items };
 }
 
-export function runnerInitial(ctx: EngineContext): RunnerInitial {
-  const qa = listQA(ctx.session.id);
+export async function runnerInitial(ctx: EngineContext): Promise<RunnerInitial> {
+  const [qa, { lights, remaining }] = await Promise.all([listQA(ctx.session.id), lightsFor(ctx)]);
   const pending = qa.find((x) => !x.answer)?.question ?? null;
-  const { lights, remaining } = lightsFor(ctx);
   const reflection = parseReflection(ctx.session.reflection);
   return {
     surveyId: ctx.survey.id,

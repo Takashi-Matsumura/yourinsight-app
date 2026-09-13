@@ -8,7 +8,10 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
   await connection();
-  const surveys = listSurveys().map((s) => ({ ...s, counts: countSessions(s.id) }));
+  const surveyList = await listSurveys();
+  const surveys = await Promise.all(
+    surveyList.map(async (s) => ({ ...s, counts: await countSessions(s.id) })),
+  );
 
   return (
     <div className="space-y-8">

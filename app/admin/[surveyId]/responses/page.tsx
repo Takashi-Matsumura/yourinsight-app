@@ -25,15 +25,17 @@ function fmt(iso: string): string {
 export default async function ResponsesPage(props: PageProps<"/admin/[surveyId]/responses">) {
   await connection();
   const { surveyId } = await props.params;
-  const survey = getSurvey(surveyId);
+  const survey = await getSurvey(surveyId);
   if (!survey) notFound();
-  const topics = listTopics(surveyId);
+  const [topics, sessionList] = await Promise.all([listTopics(surveyId), listSessions(surveyId)]);
   const topicLabel = new Map(topics.map((t) => [t.id, t.label]));
-  const sessions = listSessions(surveyId).map((s) => ({
-    ...s,
-    qa: listQA(s.id),
-    reflection: parseReflection(s.reflection),
-  }));
+  const sessions = await Promise.all(
+    sessionList.map(async (s) => ({
+      ...s,
+      qa: await listQA(s.id),
+      reflection: parseReflection(s.reflection),
+    })),
+  );
 
   const agg = new Map<string, Agg>();
   for (const s of sessions) {

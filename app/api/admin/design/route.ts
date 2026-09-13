@@ -37,11 +37,10 @@ export async function POST(req: NextRequest) {
   if (!purpose) return Response.json({ error: "purpose required" }, { status: 400 });
   const audience = (body.audience ?? "").trim();
   const viewpoint: SurveyViewpoint = body.viewpoint === "organization" ? "organization" : "individual";
-  const solutions = (body.solutionIds ?? [])
-    .map((id) => getSolution(id))
-    .filter((s): s is Solution => s !== null);
+  const resolvedSolutions = await Promise.all((body.solutionIds ?? []).map((id) => getSolution(id)));
+  const solutions = resolvedSolutions.filter((s): s is Solution => s !== null);
   const solutionKeys = solutions.map((_, i) => `S${i + 1}`);
-  const settings = getLlmSettings();
+  const settings = await getLlmSettings();
   const messages = surveyDesignMessages({ purpose, audience, viewpoint, solutions });
   const schema = surveyDesignSchema(solutionKeys);
 

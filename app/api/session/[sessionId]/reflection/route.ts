@@ -34,7 +34,7 @@ const EMPTY_REFLECTION: Reflection = {
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[sessionId]/reflection">) {
   const { sessionId } = await ctx.params;
   const body = (await req.json().catch(() => ({}))) as Body;
-  const ectx = loadContext(sessionId);
+  const ectx = await loadContext(sessionId);
   if (!ectx) return Response.json({ error: "session not found" }, { status: 404 });
 
   return sseResponse(async (send, signal) => {
@@ -47,18 +47,18 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[se
     }
 
     if (ectx.session.status === "in_progress") {
-      completeSession(sessionId, body.endEarly === true);
+      await completeSession(sessionId, body.endEarly === true);
     }
 
-    const qa = listQA(sessionId).filter((x) => x.answer);
+    const qa = (await listQA(sessionId)).filter((x) => x.answer);
     if (qa.length === 0) {
-      saveReflection(sessionId, JSON.stringify(EMPTY_REFLECTION));
+      await saveReflection(sessionId, JSON.stringify(EMPTY_REFLECTION));
       send("reflection", EMPTY_REFLECTION);
       return;
     }
 
-    const settings = getLlmSettings();
-    const solutions = getSurveySolutions(ectx.survey.id);
+    const settings = await getLlmSettings();
+    const solutions = await getSurveySolutions(ectx.survey.id);
     const solutionKeys = solutions.map((_, i) => `S${i + 1}`);
     const messages = reflectionMessages({ survey: ectx.survey, topics: ectx.topics, qa, solutions });
     const schema = reflectionSchema(solutionKeys);
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[se
         },
       );
       if (signal.aborted) return;
-      saveReflection(sessionId, JSON.stringify(reflection));
+      await saveReflection(sessionId, JSON.stringify(reflection));
       send("reflection", reflection);
     } catch (e) {
       if (signal.aborted) return;
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[se
         thanks: "話してくれて、ありがとうございました。",
         recommended_solutions: [],
       };
-      saveReflection(sessionId, JSON.stringify(fallback));
+      await saveReflection(sessionId, JSON.stringify(fallback));
       send("reflection", fallback);
     }
   }, req.signal);

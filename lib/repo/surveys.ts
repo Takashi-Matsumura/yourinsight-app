@@ -45,13 +45,15 @@ function rowToTopic(r: TopicRow): Topic {
   return { ...r, fallback_question: parseJson<GeneratedQuestion>(r.fallback_question) };
 }
 
-export function listSurveys(): Survey[] {
-  const rows = db().prepare("SELECT * FROM surveys ORDER BY created_at DESC").all() as unknown as SurveyRow[];
-  return rows.map(rowToSurvey);
+export async function listSurveys(): Promise<Survey[]> {
+  const { results } = await db()
+    .prepare("SELECT * FROM surveys ORDER BY created_at DESC")
+    .all<SurveyRow>();
+  return results.map(rowToSurvey);
 }
 
-export function getSurvey(id: string): Survey | null {
-  const row = db().prepare("SELECT * FROM surveys WHERE id = ?").get(id) as SurveyRow | undefined;
+export async function getSurvey(id: string): Promise<Survey | null> {
+  const row = await db().prepare("SELECT * FROM surveys WHERE id = ?").bind(id).first<SurveyRow>();
   return row ? rowToSurvey(row) : null;
 }
 
@@ -66,15 +68,15 @@ export interface SurveyInput {
   viewpoint?: SurveyViewpoint;
 }
 
-export function createSurvey(input: SurveyInput): Survey {
+export async function createSurvey(input: SurveyInput): Promise<Survey> {
   const id = newId();
   const now = nowIso();
-  db()
+  await db()
     .prepare(
       `INSERT INTO surveys (id, title, purpose, audience, intro_text, max_per_topic, hard_cap, status, seed_questions, cta_text, viewpoint, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'draft', NULL, ?, ?, ?, ?)`,
     )
-    .run(
+    .bind(
       id,
       input.title,
       input.purpose,
@@ -86,19 +88,20 @@ export function createSurvey(input: SurveyInput): Survey {
       input.viewpoint ?? "individual",
       now,
       now,
-    );
-  return getSurvey(id)!;
+    )
+    .run();
+  return (await getSurvey(id))!;
 }
 
-export function updateSurvey(id: string, patch: Partial<SurveyInput>): void {
-  const current = getSurvey(id);
+export async function updateSurvey(id: string, patch: Partial<SurveyInput>): Promise<void> {
+  const current = await getSurvey(id);
   if (!current) return;
   const next = { ...current, ...patch };
-  db()
+  await db()
     .prepare(
       `UPDATE surveys SET title = ?, purpose = ?, audience = ?, intro_text = ?, max_per_topic = ?, hard_cap = ?, cta_text = ?, viewpoint = ?, updated_at = ? WHERE id = ?`,
     )
-    .run(
+    .bind(
       next.title,
       next.purpose,
       next.audience,
@@ -109,28 +112,34 @@ export function updateSurvey(id: string, patch: Partial<SurveyInput>): void {
       next.viewpoint,
       nowIso(),
       id,
-    );
+    )
+    .run();
 }
 
-export function setSurveyStatus(id: string, status: SurveyStatus): void {
-  db().prepare("UPDATE surveys SET status = ?, updated_at = ? WHERE id = ?").run(status, nowIso(), id);
+export async function setSurveyStatus(id: string, status: SurveyStatus): Promise<void> {
+  await db()
+    .prepare("UPDATE surveys SET status = ?, updated_at = ? WHERE id = ?")
+    .bind(status, nowIso(), id)
+    .run();
 }
 
-export function setSeedQuestions(id: string, seed: SeedQuestions | null): void {
-  db()
+export async function setSeedQuestions(id: string, seed: SeedQuestions | null): Promise<void> {
+  await db()
     .prepare("UPDATE surveys SET seed_questions = ?, updated_at = ? WHERE id = ?")
-    .run(seed ? JSON.stringify(seed) : null, nowIso(), id);
+    .bind(seed ? JSON.stringify(seed) : null, nowIso(), id)
+    .run();
 }
 
-export function deleteSurvey(id: string): void {
-  db().prepare("DELETE FROM surveys WHERE id = ?").run(id);
+export async function deleteSurvey(id: string): Promise<void> {
+  await db().prepare("DELETE FROM surveys WHERE id = ?").bind(id).run();
 }
 
-export function listTopics(surveyId: string): Topic[] {
-  const rows = db()
+export async function listTopics(surveyId: string): Promise<Topic[]> {
+  const { results } = await db()
     .prepare("SELECT * FROM survey_topics WHERE survey_id = ? ORDER BY order_index")
-    .all(surveyId) as unknown as TopicRow[];
-  return rows.map(rowToTopic);
+    .bind(surveyId)
+    .all<TopicRow>();
+  return results.map(rowToTopic);
 }
 
 export interface TopicInput {
@@ -142,29 +151,29 @@ export interface TopicInput {
   target_solution_id?: string | null;
 }
 
-export function replaceTopics(surveyId: string, topics: TopicInput[]): Topic[] {
+export async function replaceTopics(surveyId: string, topics: TopicInput[]): Promise<Topic[]> {
   const d = db();
   const keepIds = topics.map((t) => t.id).filter((x): x is string => Boolean(x));
-  d.exec("BEGIN");
-  try {
-    if (keepIds.length === 0) {
-      d.prepare("DELETE FROM survey_topics WHERE survey_id = ?").run(surveyId);
-    } else {
-      const placeholders = keepIds.map(() => "?").join(",");
-      d.prepare(`DELETE FROM survey_topics WHERE survey_id = ? AND id NOT IN (${placeholders})`).run(
-        surveyId,
-        ...keepIds,
-      );
-    }
-    const upsert = d.prepare(
-      `INSERT INTO survey_topics (id, survey_id, order_index, label, description, priority, fallback_question, target_solution_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET order_index = excluded.order_index, label = excluded.label,
-         description = excluded.description, priority = excluded.priority, fallback_question = excluded.fallback_question,
-         target_solution_id = excluded.target_solution_id`,
-    );
-    topics.forEach((t, i) => {
-      upsert.run(
+
+  const deleteStmt =
+    keepIds.length === 0
+      ? d.prepare("DELETE FROM survey_topics WHERE survey_id = ?").bind(surveyId)
+      : d
+          .prepare(
+            `DELETE FROM survey_topics WHERE survey_id = ? AND id NOT IN (${keepIds.map(() => "?").join(",")})`,
+          )
+          .bind(surveyId, ...keepIds);
+
+  const upsertSql = `INSERT INTO survey_topics (id, survey_id, order_index, label, description, priority, fallback_question, target_solution_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET order_index = excluded.order_index, label = excluded.label,
+       description = excluded.description, priority = excluded.priority, fallback_question = excluded.fallback_question,
+       target_solution_id = excluded.target_solution_id`;
+
+  const upsertStmts = topics.map((t, i) =>
+    d
+      .prepare(upsertSql)
+      .bind(
         t.id ?? newId(),
         surveyId,
         i,
@@ -173,22 +182,22 @@ export function replaceTopics(surveyId: string, topics: TopicInput[]): Topic[] {
         t.priority,
         t.fallback_question ? JSON.stringify(t.fallback_question) : null,
         t.target_solution_id ?? null,
-      );
-    });
-    d.exec("COMMIT");
-  } catch (e) {
-    d.exec("ROLLBACK");
-    throw e;
-  }
+      ),
+  );
+
+  await d.batch([deleteStmt, ...upsertStmts]);
   return listTopics(surveyId);
 }
 
-export function countSessions(surveyId: string): { total: number; completed: number } {
-  const row = db()
+export async function countSessions(
+  surveyId: string,
+): Promise<{ total: number; completed: number }> {
+  const row = await db()
     .prepare(
       `SELECT COUNT(*) AS total, SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed
        FROM sessions WHERE survey_id = ?`,
     )
-    .get(surveyId) as { total: number; completed: number | null };
-  return { total: row.total, completed: row.completed ?? 0 };
+    .bind(surveyId)
+    .first<{ total: number; completed: number | null }>();
+  return { total: row!.total, completed: row!.completed ?? 0 };
 }

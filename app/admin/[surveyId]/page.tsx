@@ -18,13 +18,15 @@ export const dynamic = "force-dynamic";
 export default async function SurveyEditPage(props: PageProps<"/admin/[surveyId]">) {
   await connection();
   const { surveyId } = await props.params;
-  const survey = getSurvey(surveyId);
+  const survey = await getSurvey(surveyId);
   if (!survey) notFound();
-  const topics = listTopics(surveyId);
-  const counts = countSessions(surveyId);
-  const allSolutions = listSolutions();
-  const activeSolutionIds = getSurveySolutionIds(surveyId);
-  const activeSolutions = getSurveySolutions(surveyId);
+  const [topics, counts, allSolutions, activeSolutionIds, activeSolutions] = await Promise.all([
+    listTopics(surveyId),
+    countSessions(surveyId),
+    listSolutions(),
+    getSurveySolutionIds(surveyId),
+    getSurveySolutions(surveyId),
+  ]);
 
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";

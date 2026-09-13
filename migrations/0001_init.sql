@@ -1,29 +1,3 @@
-import type { DatabaseSync } from "node:sqlite";
-
-export function migrate(d: DatabaseSync): void {
-  const hasColumn = (table: string, col: string): boolean =>
-    (d.prepare(`PRAGMA table_info(${table})`).all() as unknown as { name: string }[]).some(
-      (c) => c.name === col,
-    );
-  if (!hasColumn("survey_topics", "target_solution_id")) {
-    d.exec(
-      "ALTER TABLE survey_topics ADD COLUMN target_solution_id TEXT REFERENCES solutions(id) ON DELETE SET NULL",
-    );
-  }
-  if (!hasColumn("surveys", "cta_text")) {
-    d.exec(
-      "ALTER TABLE surveys ADD COLUMN cta_text TEXT NOT NULL DEFAULT 'ブースのスタッフにお尋ねください'",
-    );
-  }
-  if (!hasColumn("surveys", "viewpoint")) {
-    d.exec("ALTER TABLE surveys ADD COLUMN viewpoint TEXT NOT NULL DEFAULT 'individual'");
-  }
-  if (!hasColumn("questions", "satisfied_topic_ids")) {
-    d.exec("ALTER TABLE questions ADD COLUMN satisfied_topic_ids TEXT NOT NULL DEFAULT '[]'");
-  }
-}
-
-export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS surveys (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
@@ -130,4 +104,3 @@ CREATE TABLE IF NOT EXISTS analyses (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_analyses_survey ON analyses(survey_id, created_at);
-`;

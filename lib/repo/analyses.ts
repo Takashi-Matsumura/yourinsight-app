@@ -9,10 +9,11 @@ export interface StoredAnalysis {
   created_at: string;
 }
 
-export function latestAnalysis(surveyId: string): StoredAnalysis | null {
-  const row = db()
+export async function latestAnalysis(surveyId: string): Promise<StoredAnalysis | null> {
+  const row = await db()
     .prepare("SELECT * FROM analyses WHERE survey_id = ? ORDER BY created_at DESC LIMIT 1")
-    .get(surveyId) as unknown as { id: string; survey_id: string; content: string; session_count: number; created_at: string } | undefined;
+    .bind(surveyId)
+    .first<{ id: string; survey_id: string; content: string; session_count: number; created_at: string }>();
   if (!row) return null;
   try {
     const parsed = JSON.parse(row.content) as Partial<Analysis>;
@@ -28,10 +29,15 @@ export function latestAnalysis(surveyId: string): StoredAnalysis | null {
   }
 }
 
-export function saveAnalysis(surveyId: string, content: Analysis, sessionCount: number): StoredAnalysis {
+export async function saveAnalysis(
+  surveyId: string,
+  content: Analysis,
+  sessionCount: number,
+): Promise<StoredAnalysis> {
   const id = newId();
-  db()
+  await db()
     .prepare("INSERT INTO analyses (id, survey_id, content, session_count, created_at) VALUES (?, ?, ?, ?, ?)")
-    .run(id, surveyId, JSON.stringify(content), sessionCount, nowIso());
-  return latestAnalysis(surveyId)!;
+    .bind(id, surveyId, JSON.stringify(content), sessionCount, nowIso())
+    .run();
+  return (await latestAnalysis(surveyId))!;
 }

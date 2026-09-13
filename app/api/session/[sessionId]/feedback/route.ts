@@ -9,8 +9,8 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[se
   if (body.feedback !== "agree" && body.feedback !== "disagree") {
     return Response.json({ error: "invalid feedback" }, { status: 400 });
   }
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) return Response.json({ error: "session not found" }, { status: 404 });
-  saveReflectionFeedback(sessionId, body.feedback);
+  await saveReflectionFeedback(sessionId, body.feedback);
   return Response.json({ ok: true });
 }

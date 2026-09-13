@@ -8,9 +8,9 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/admin/surveys/[surveyId]/seed">) {
   const { surveyId } = await ctx.params;
   const body = (await req.json().catch(() => ({}))) as { keepQ1?: boolean };
-  const survey = getSurvey(surveyId);
+  const survey = await getSurvey(surveyId);
   if (!survey) return Response.json({ error: "not found" }, { status: 404 });
-  const topics = listTopics(surveyId);
+  const topics = await listTopics(surveyId);
   if (topics.length === 0) return Response.json({ error: "論点がありません" }, { status: 400 });
 
   return sseResponse(async (send) => {
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/admin/surve
       { survey, topics },
       { keepQ1, onProgress: (p) => send("progress", p) },
     );
-    setSeedQuestions(surveyId, seed);
+    await setSeedQuestions(surveyId, seed);
     send("seed", seed);
   }, req.signal);
 }
