@@ -1,8 +1,7 @@
 "use client";
-/// <reference types="react/canary" />
-
 import Link from "next/link";
-import { startTransition, useEffect, useRef, useState, ViewTransition } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
+import { ViewTransition } from "@/lib/view-transition";
 import { readSse } from "@/lib/sse-client";
 import {
   ESCAPE_OPTION,
