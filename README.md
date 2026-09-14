@@ -49,6 +49,31 @@ npx wrangler d1 migrations apply yourinsight --local
 
 同時実行数は、推論サーバが同時に処理できるリクエスト数（例: llama.cpp サーバの `-np` オプション）に合わせて設定してください。
 
+### ローカル開発環境の仕組み
+
+`npm run dev:vinext` は Cloudflare Workers のランタイム（workerd）をローカルで起動し、D1 バインディング `DB` を Miniflare がローカルの SQLite ファイルでエミュレートします。アプリのコードは本番と同じ D1 API で動作するため、ローカル用の分岐や環境変数は不要です。
+
+ローカル D1 の実体は次の場所にあり、`.gitignore` 対象です（リポジトリには含まれません）。
+
+```
+.wrangler/state/v3/d1/miniflare-D1DatabaseObject/<hash>.sqlite
+```
+
+ローカルと Cloudflare 上の環境は完全に独立しており、同時に利用できます。
+
+| | ローカル開発 | Cloudflare（デプロイ先） |
+|---|---|---|
+| 起動 | `npm run dev:vinext` → `http://localhost:3001` | デプロイ済み Worker が常時稼働 |
+| DB | `.wrangler/state/` 配下の SQLite（ローカル専用） | リモート D1 `yourinsight` |
+| マイグレーション | `npx wrangler d1 migrations apply yourinsight --local` | 同コマンドに `--remote` |
+| DB の中身の確認 | `npx wrangler d1 execute yourinsight --local --command "SELECT …"` | 同コマンドに `--remote` |
+| LLM 接続先 | `/admin/settings` の設定値（既定 `http://localhost:8080`）。同じ PC の LLM に直接接続 | `/admin/settings` で Tunnel のホスト名を指定 |
+| Cloudflare Tunnel | 不要 | Worker からローカル LLM を使う検証時のみ手動起動 |
+
+LLM の接続先は環境変数ではなく各環境の DB に保存されるため、ローカルとリモートで別々の設定を保持できます。
+
+ローカル D1 を初期化したい場合は `.wrangler/state/v3/d1/` を削除し、マイグレーションを再適用します。`wrangler dev --remote` でリモート D1 に直接接続することもできますが、本番データを書き換えるため通常は使用しません。
+
 ## Cloudflareへのデプロイ
 
 ```bash
