@@ -90,26 +90,16 @@ npx wrangler secret put CF_ACCESS_CLIENT_SECRET
    ```bash
    cloudflared tunnel route dns <tunnel名> llm.<あなたのドメイン>
    ```
-4. **マシン起動時から常駐させる（ログイン前から起動する場合）**
-   ユーザーのLaunchAgentではなく、root権限のLaunchDaemonとして登録する。`--config`で設定ファイルの場所を明示しないと、root実行時に`~/.cloudflared/`が`/var/root/.cloudflared/`を指してしまい認証情報が見つからないので注意。
+4. **トンネルを起動する（必要なときだけ手動で起動）**
+   開発用PCではトンネルを常駐させる必要はありません。Cloudflare上のWorkerからローカルLLMを使って検証するときだけ、ターミナルで起動します。
    ```bash
-   sudo /usr/libexec/PlistBuddy -c "Add :Label string com.cloudflare.cloudflared" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
-   sudo /usr/libexec/PlistBuddy -c "Add :ProgramArguments array" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
-   sudo /usr/libexec/PlistBuddy -c "Add :ProgramArguments:0 string /opt/homebrew/bin/cloudflared" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
-   sudo /usr/libexec/PlistBuddy -c "Add :ProgramArguments:1 string --config" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
-   sudo /usr/libexec/PlistBuddy -c "Add :ProgramArguments:2 string /Users/<user>/.cloudflared/config.yml" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
-   sudo /usr/libexec/PlistBuddy -c "Add :ProgramArguments:3 string tunnel" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
-   sudo /usr/libexec/PlistBuddy -c "Add :ProgramArguments:4 string run" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
-   sudo /usr/libexec/PlistBuddy -c "Add :RunAtLoad bool true" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
-   sudo /usr/libexec/PlistBuddy -c "Add :StandardOutPath string /Library/Logs/com.cloudflare.cloudflared.out.log" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
-   sudo /usr/libexec/PlistBuddy -c "Add :StandardErrorPath string /Library/Logs/com.cloudflare.cloudflared.err.log" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
-   sudo /usr/libexec/PlistBuddy -c "Add :KeepAlive:SuccessfulExit bool false" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
-   sudo /usr/libexec/PlistBuddy -c "Add :ThrottleInterval integer 5" /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
-   sudo chown root:wheel /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
-   sudo chmod 644 /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
-   sudo launchctl bootstrap system /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+   cloudflared tunnel run <tunnel名>
    ```
-   （ログイン中だけ動けばよい場合は `cloudflared service install` で作成されるユーザーLaunchAgentのままでよいが、`ProgramArguments`に`tunnel run <ID>`が入っているか確認すること）
+   `Ctrl+C` で停止します。ローカル開発サーバ（`npm run dev:vinext`）は同じPC上のLLMに直接接続するため、トンネルの起動有無に影響されません。
+   接続状態は次のコマンドで確認できます（`CONNECTIONS` 列に接続が表示されれば開通）。
+   ```bash
+   cloudflared tunnel info <tunnel名>
+   ```
 5. **Cloudflare Accessで保護する**（Zero Trustダッシュボード）
    1. 「Access コントロール」→「サービス資格情報」→「サービストークンを作成する」
    2. 「Access コントロール」→「ポリシー」→ アクション「サービス認証」、含める条件に上記トークンを指定したポリシーを作成
