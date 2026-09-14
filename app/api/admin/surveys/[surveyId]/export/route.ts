@@ -5,7 +5,11 @@ import { listQA, listSessions, parseReflection } from "@/lib/repo/sessions";
 export const dynamic = "force-dynamic";
 
 function csvCell(v: unknown): string {
-  const s = v === null || v === undefined ? "" : String(v);
+  let s = v === null || v === undefined ? "" : String(v);
+  // Neutralise spreadsheet formula injection for free text and visitor ids
+  // (a badge can carry arbitrary text). Spreadsheets treat a leading
+  // apostrophe as a text prefix.
+  if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
@@ -18,6 +22,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/api/admin/surve
 
   const header = [
     "session_id",
+    "external_id",
     "started_at",
     "status",
     "ended_early",
@@ -42,6 +47,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/api/admin/surve
       lines.push(
         [
           s.id,
+          s.external_id ?? "",
           s.started_at,
           s.status,
           s.ended_early ? 1 : 0,

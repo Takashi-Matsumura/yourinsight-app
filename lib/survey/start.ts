@@ -10,12 +10,15 @@ import {
 import type { Question, Session } from "@/lib/types";
 import type { HistoryPayload, Light, PublicQuestion, QuestionPayload, RunnerInitial } from "@/lib/survey/public";
 
-export async function startSession(surveyId: string): Promise<Session> {
+export async function startSession(
+  surveyId: string,
+  externalId: string | null = null,
+): Promise<Session> {
   const survey = await getSurvey(surveyId);
   if (!survey || survey.status !== "published") {
     throw new Error("このアンケートは現在受け付けていません");
   }
-  const session = await createSession(surveyId);
+  const session = await createSession(surveyId, externalId);
   const ctx: EngineContext = { survey, topics: await listTopics(surveyId), session };
   const seed = seedFor(ctx, []);
   if (seed) await persistQuestion(ctx, seed, "seed", null, 0);
