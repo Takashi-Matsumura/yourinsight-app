@@ -147,6 +147,14 @@ export default async function ResponsesPage(props: PageProps<"/admin/[surveyId]/
                       {s.status === "completed" ? (s.ended_early ? "途中で終了" : "完了") : "回答中"}
                     </span>
                     <span className="text-ink-muted">{s.qa.filter((x) => x.answer).length}問</span>
+                    {s.external_id && (
+                      <span
+                        title={s.external_id}
+                        className="max-w-40 truncate rounded-sm bg-paper-3 px-2 py-0.5 font-mono text-xs text-ink-muted"
+                      >
+                        {s.external_id}
+                      </span>
+                    )}
                     {s.reflection_feedback && (
                       <span className="text-xs rounded-sm bg-paper-3 px-2 py-0.5 text-ink-muted">
                         {s.reflection_feedback === "agree" ? "そうかも" : "ちがう気がする"}
@@ -160,6 +168,12 @@ export default async function ResponsesPage(props: PageProps<"/admin/[surveyId]/
                     <span className="ml-auto text-ink-faint group-open:rotate-90 transition-transform duration-(--dur-fast)">›</span>
                   </summary>
                   <div className="pb-5 pl-12 space-y-3">
+                    {s.external_id && (
+                      <p className="text-sm">
+                        <span className="text-ink-faint">来場者ID </span>
+                        <span className="font-mono text-ink break-all">{s.external_id}</span>
+                      </p>
+                    )}
                     {s.qa.map(({ question, answer }) => (
                       <div key={question.id} className="text-sm">
                         <p className="text-ink-muted">

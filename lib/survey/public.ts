@@ -46,3 +46,6 @@ export interface RunnerInitial {
 }
 
 export const ESCAPE_OPTION = "どれでもない";
+
+/** Upper bound for a visitor badge id scanned on the intro screen (sessions.external_id). */
+export const EXTERNAL_ID_MAX = 256;

@@ -65,15 +65,18 @@ function rowToQuestion(r: QuestionRow): Question {
   return { ...r, options, satisfied_topic_ids: satisfiedTopicIds };
 }
 
-export async function createSession(surveyId: string): Promise<Session> {
+export async function createSession(
+  surveyId: string,
+  externalId: string | null = null,
+): Promise<Session> {
   const d = db();
   const id = newId();
   await d.batch([
     d
       .prepare(
-        "INSERT INTO sessions (id, survey_id, status, started_at) VALUES (?, ?, 'in_progress', ?)",
+        "INSERT INTO sessions (id, survey_id, status, started_at, external_id) VALUES (?, ?, 'in_progress', ?, ?)",
       )
-      .bind(id, surveyId, nowIso()),
+      .bind(id, surveyId, nowIso(), externalId),
     d
       .prepare(
         `INSERT INTO topic_coverage (session_id, topic_id, satisfied, asked_count)
