@@ -10,7 +10,7 @@ import {
   type QA,
 } from "@/lib/repo/sessions";
 import { complete, completeStream, LlmError } from "@/lib/llm/client";
-import { enqueue } from "@/lib/llm/queue";
+import { enqueue, QUESTION_QUEUE } from "@/lib/llm/queue";
 import { nextQuestionMessages } from "@/lib/llm/prompts";
 import { nextQuestionSchema } from "@/lib/llm/schemas";
 import { extractPartialString } from "@/lib/llm/partial";
@@ -260,7 +260,7 @@ export async function generateNextQuestion(ctx: EngineContext, opts: GenerateOpt
       if (suppressLead) generated.lead = "";
       return { generated, done, latencyMs: Date.now() - started };
     },
-    { maxConcurrency: settings.maxConcurrency, signal: opts.signal, onPosition: opts.onQueued },
+    { queue: QUESTION_QUEUE, maxConcurrency: settings.maxConcurrency, signal: opts.signal, onPosition: opts.onQueued },
   );
 }
 
@@ -285,7 +285,7 @@ export async function generateQuestionOnce(
   const schema = nextQuestionSchema(keys, { allowText: !qa.some((x) => x.question.kind === "text") });
   const r = await enqueue(
     () => complete({ settings, messages, schema, maxTokens: 220, timeoutMs: 90_000 }),
-    { maxConcurrency: settings.maxConcurrency, maxQueue: 32 },
+    { queue: QUESTION_QUEUE, maxConcurrency: settings.maxConcurrency, maxQueue: 32 },
   );
   return normalize(ctx, JSON.parse(r.content) as RawGenerated).generated;
 }
