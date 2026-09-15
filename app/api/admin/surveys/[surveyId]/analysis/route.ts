@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { sseResponse } from "@/lib/llm/sse";
 import { complete } from "@/lib/llm/client";
-import { enqueue } from "@/lib/llm/queue";
+import { enqueue, HEAVY_QUEUE } from "@/lib/llm/queue";
 import { analysisMessages } from "@/lib/llm/prompts";
 import { analysisSchema } from "@/lib/llm/schemas";
 import { getSurvey, listTopics } from "@/lib/repo/surveys";
@@ -61,7 +61,13 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/admin/surve
           timeoutMs: 300_000,
         });
       },
-      { maxConcurrency: settings.maxConcurrency, maxQueue: 16, signal, onPosition: (p) => send("queued", { position: p }) },
+      {
+        queue: HEAVY_QUEUE,
+        maxConcurrency: settings.maxConcurrency,
+        maxQueue: 16,
+        signal,
+        onPosition: (p) => send("queued", { position: p }),
+      },
     );
     if (signal.aborted) return;
     const parsed = JSON.parse(r.content) as Analysis;

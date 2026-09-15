@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { sseResponse } from "@/lib/llm/sse";
 import { completeStream } from "@/lib/llm/client";
-import { enqueue } from "@/lib/llm/queue";
+import { enqueue, HEAVY_QUEUE } from "@/lib/llm/queue";
 import { surveyDesignMessages } from "@/lib/llm/prompts";
 import { surveyDesignSchema } from "@/lib/llm/schemas";
 import { extractAllStrings, extractPartialString } from "@/lib/llm/partial";
@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
         return JSON.parse(raw) as RawDesign;
       },
       {
+        queue: HEAVY_QUEUE,
         maxConcurrency: settings.maxConcurrency,
         maxQueue: 16,
         signal,

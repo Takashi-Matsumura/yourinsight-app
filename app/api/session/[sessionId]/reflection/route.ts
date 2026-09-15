@@ -4,7 +4,7 @@ import { loadContext, solutionIdFromKey } from "@/lib/survey/engine";
 import { completeSession, listQA, parseReflection, saveReflection } from "@/lib/repo/sessions";
 import { getLlmSettings } from "@/lib/repo/settings";
 import { completeStream } from "@/lib/llm/client";
-import { enqueue } from "@/lib/llm/queue";
+import { enqueue, HEAVY_QUEUE } from "@/lib/llm/queue";
 import { reflectionMessages } from "@/lib/llm/prompts";
 import { reflectionSchema } from "@/lib/llm/schemas";
 import { extractPartialString, extractPartialStringArray } from "@/lib/llm/partial";
@@ -99,6 +99,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/session/[se
           return result;
         },
         {
+          queue: HEAVY_QUEUE,
           maxConcurrency: settings.maxConcurrency,
           signal,
           onPosition: (position) => send("queued", { position }),
